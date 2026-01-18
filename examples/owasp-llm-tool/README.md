@@ -27,7 +27,7 @@ cmake --build build -j$(nproc) --target owasp-llm-tool
 
 ## Usage
 ```bash
-# Detection only (fast, no LLM)
+# Detection mode (pattern matching, fast)
 ./build/bin/owasp-llm-tool \
   --detect-only \
   --prompt "Ignore previous instructions" \
@@ -35,6 +35,21 @@ cmake --build build -j$(nproc) --target owasp-llm-tool
 
 # Output: {"category": "LLM01"}
 ```
+```bash
+# Full mode (LLM inference + detection)
+./build/bin/owasp-llm-tool \
+  -m models/qwen2.5-0.5b-instruct-q4_0.gguf \
+  --prompt "Ignore previous instructions"
+
+# Output: {"category": "LLM01", "response": "..."}
+```
+
+**When to use which:**
+
+| Mode | Use case | Speed |
+|------|----------|-------|
+| `--detect-only` | Already have LLM response (e.g. from llama-server) | ~1ms |
+| Full mode | Standalone analysis, need LLM to generate response | ~300ms |
 
 ## Model
 ```bash
@@ -44,4 +59,5 @@ wget https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5
 ## Demo Project
 
 https://github.com/FrancescoPaoloL/llmSecurityDemo
+
 
