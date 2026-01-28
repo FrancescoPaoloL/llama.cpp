@@ -24,7 +24,7 @@ std::string naive_risk_classifier(const std::string& prompt) {
 
     // LLM06: Excessive Agency (system extraction - more specific)
     if (lower.find("system prompt") != std::string::npos ||
-        lower.find("instructions") != std::string::npos ||
+        lower.find("system instructions") != std::string::npos ||
         lower.find("your guidelines") != std::string::npos ||
         lower.find("your configuration") != std::string::npos ||
         lower.find("your rules") != std::string::npos ||
