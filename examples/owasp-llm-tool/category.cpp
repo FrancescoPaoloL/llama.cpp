@@ -18,23 +18,12 @@ std::string naive_risk_classifier(const std::string& prompt) {
         lower.find("drop database") != std::string::npos ||
         lower.find("delete from") != std::string::npos ||
         lower.find("<script") != std::string::npos ||
+        lower.find("malware") != std::string::npos ||
         lower.find("';--") != std::string::npos) {
         return "LLM02";
     }
 
-    // LLM06: Excessive Agency (system extraction - more specific)
-    if (lower.find("system prompt") != std::string::npos ||
-        lower.find("system instructions") != std::string::npos ||
-        lower.find("your guidelines") != std::string::npos ||
-        lower.find("your configuration") != std::string::npos ||
-        lower.find("your rules") != std::string::npos ||
-        lower.find("reveal your") != std::string::npos ||
-        lower.find("show me your") != std::string::npos ||
-        lower.find("tell me your prompt") != std::string::npos) {
-        return "LLM06";
-    }
-
-    // LLM01: Prompt Injection (broader override patterns)
+    // LLM01: Prompt Injection (check BEFORE LLM06 to catch override attempts)
     if (lower.find("ignore") != std::string::npos ||
         lower.find("disregard") != std::string::npos ||
         lower.find("forget") != std::string::npos ||
@@ -44,6 +33,20 @@ std::string naive_risk_classifier(const std::string& prompt) {
         lower.find("bypass") != std::string::npos ||
         lower.find("reset") != std::string::npos) {
         return "LLM01";
+    }
+
+    // LLM06: Excessive Agency (system extraction - more specific)
+    if (lower.find("system prompt") != std::string::npos ||
+        lower.find("system instructions") != std::string::npos ||
+        lower.find("your instructions") != std::string::npos ||
+        lower.find("your guidelines") != std::string::npos ||
+        lower.find("your configuration") != std::string::npos ||
+        lower.find("your rules") != std::string::npos ||
+        lower.find("what rules") != std::string::npos ||
+        lower.find("reveal your") != std::string::npos ||
+        lower.find("show me your") != std::string::npos ||
+        lower.find("tell me your prompt") != std::string::npos) {
+        return "LLM06";
     }
 
     return "unknown";
