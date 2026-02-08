@@ -1,6 +1,8 @@
 #include "category.h"
+#include "perplexity_utils.h"
 #include <cctype>
 
+// Existing pattern-based classifier (LLM01/02/04/06)
 std::string naive_risk_classifier(const std::string& prompt) {
     std::string lower = prompt;
     for (char& c : lower) {
@@ -23,7 +25,7 @@ std::string naive_risk_classifier(const std::string& prompt) {
         return "LLM02";
     }
 
-    // LLM01: Prompt Injection (check BEFORE LLM06 to catch override attempts)
+    // LLM01: Prompt Injection
     if (lower.find("ignore") != std::string::npos ||
         lower.find("disregard") != std::string::npos ||
         lower.find("forget") != std::string::npos ||
@@ -50,5 +52,29 @@ std::string naive_risk_classifier(const std::string& prompt) {
     }
 
     return "unknown";
+}
+
+// LLM03 Training Data Poisoning detection
+bool detect_llm03_poisoning(
+    struct llama_context* ctx,
+    const std::string& response,
+    double threshold
+) {
+    if (!ctx) {
+        return false;
+    }
+
+    PerplexityResult result = calculate_perplexity(ctx, response);
+
+    if (!result.valid) {
+        return false;
+    }
+
+    return result.value > threshold;
+}
+
+double load_llm03_threshold(const std::string& config_path) {
+    // TODO: Parse JSON config file
+    return 25.0;
 }
 
