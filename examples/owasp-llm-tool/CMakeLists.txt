@@ -4,6 +4,8 @@ project(owasp-llm-tool CXX)
 set(CMAKE_BUILD_TYPE Debug CACHE STRING "" FORCE)
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
 
+include_directories(${CMAKE_SOURCE_DIR}/external)
+
 add_executable(owasp-llm-tool
     main.cpp
     category.cpp

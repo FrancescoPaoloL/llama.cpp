@@ -9,6 +9,7 @@
 #include <vector>
 #include <ctime>
 #include <cstring>
+#include <cctype>
 
 int run_llama(const std::string& model_path, const std::string& prompt_text) {
     llama_model_params model_params = llama_model_default_params();
@@ -102,13 +103,20 @@ int run_llama(const std::string& model_path, const std::string& prompt_text) {
 
     if (category == "unknown") {
         // Only check LLM03 if no other category detected
-        double threshold = load_llm03_threshold("");
-        llm03_detected = detect_llm03_poisoning(ctx, response, threshold);
+        double threshold = load_llm03_threshold("config/llm03_baseline.json");
+
+        // Normalize prompt: remove trailing punctuation for consistent perplexity
+        std::string normalized_prompt = prompt_text;
+        while (!normalized_prompt.empty() && std::ispunct(normalized_prompt.back())) {
+            normalized_prompt.pop_back();
+        }
+
+        llm03_detected = detect_llm03_poisoning(ctx, normalized_prompt, threshold);
 
         if (llm03_detected) {
             category = "LLM03";
             // Optionally get the actual perplexity value for reporting
-            PerplexityResult result = calculate_perplexity(ctx, response);
+            PerplexityResult result = calculate_perplexity(ctx, normalized_prompt);
             if (result.valid) {
                 perplexity_value = result.value;
             }

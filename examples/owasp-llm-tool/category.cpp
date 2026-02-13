@@ -1,6 +1,9 @@
 #include "category.h"
 #include "perplexity_utils.h"
+#include <fstream>
+#include <iostream>
 #include <cctype>
+#include <nlohmann/json.hpp>
 
 // Existing pattern-based classifier (LLM01/02/04/06)
 std::string naive_risk_classifier(const std::string& prompt) {
@@ -73,8 +76,32 @@ bool detect_llm03_poisoning(
     return result.value > threshold;
 }
 
+
 double load_llm03_threshold(const std::string& config_path) {
-    // TODO: Parse JSON config file
-    return 25.0;
+    try {
+        std::ifstream f(config_path);
+        if (!f.is_open()) {
+            std::cerr << "Warning: Cannot open " << config_path
+                      << ", using default threshold 25.0\n";
+            return 25.0;
+        }
+
+        nlohmann::json j = nlohmann::json::parse(f);
+
+        // Read from "models.default.threshold"
+        if (j.contains("models") &&
+            j["models"].contains("default") &&
+            j["models"]["default"].contains("threshold")) {
+            return j["models"]["default"]["threshold"].get<double>();
+        }
+
+        std::cerr << "Warning: threshold not found in config, using default 25.0\n";
+        return 25.0;
+
+    } catch (const std::exception& e) {
+        std::cerr << "Error parsing config: " << e.what()
+                  << ", using default 25.0\n";
+        return 25.0;
+    }
 }
 
