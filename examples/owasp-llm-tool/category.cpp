@@ -40,6 +40,19 @@ std::string naive_risk_classifier(const std::string& prompt) {
         return "LLM01";
     }
 
+    // LLM05: Supply Chain
+    if (lower.find("load model from") != std::string::npos ||
+        lower.find("download model from") != std::string::npos ||
+        lower.find("swap model with") != std::string::npos ||
+        lower.find("replace model with") != std::string::npos ||
+        lower.find("use this model instead") != std::string::npos ||
+        lower.find("switch to this model") != std::string::npos ||
+        lower.find("load from huggingface") != std::string::npos ||
+        lower.find("use this gguf") != std::string::npos ||
+        lower.find("custom weights file") != std::string::npos) {
+        return "LLM05";
+    }
+
     // LLM06: Excessive Agency (system extraction - more specific)
     if (lower.find("system prompt") != std::string::npos ||
         lower.find("system instructions") != std::string::npos ||
