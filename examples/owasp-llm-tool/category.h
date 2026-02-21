@@ -1,8 +1,8 @@
 #ifndef CATEGORY_H
 #define CATEGORY_H
-
 #include <string>
 #include "llama.h"
+#include "llm09_misinformation.h"
 
 // Pattern-based detection (LLM01/02/04/06)
 std::string naive_risk_classifier(const std::string& prompt);

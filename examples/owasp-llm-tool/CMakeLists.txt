@@ -12,6 +12,7 @@ add_executable(owasp-llm-tool
     json_utils.cpp
     llama_runner.cpp
     perplexity_utils.cpp
+    llm09_misinformation.cpp
 )
 
 target_link_libraries(owasp-llm-tool

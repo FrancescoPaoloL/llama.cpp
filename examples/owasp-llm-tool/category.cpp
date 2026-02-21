@@ -67,6 +67,14 @@ std::string naive_risk_classifier(const std::string& prompt) {
         return "LLM06";
     }
 
+    // LLM09: Misinformation
+    float llm09_score = detect_llm09_misinformation(prompt);
+    //std::cerr << "LLM09 score: " << llm09_score << "\n";
+    if (llm09_score >= 0.5f) {
+        return "LLM09";
+    }
+
+
     return "unknown";
 }
 
