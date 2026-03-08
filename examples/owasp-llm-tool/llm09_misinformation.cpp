@@ -173,7 +173,9 @@ static float detect_presupposition(const std::string& lower) {
     }
 
     if (!has_opener) return 0.0f;
-    return matches_any(lower, p.presupposition_signals) ? 0.8f : 0.3f;
+    return matches_any(lower, p.presupposition_signals)
+        ? Llm09Config::PRESUPPOSITION_WITH_SIGNAL
+        : Llm09Config::PRESUPPOSITION_NO_SIGNAL;
 }
 
 // Detects requests for granular details about unknown entities
@@ -195,15 +197,15 @@ static float detect_authority(const std::string& lower) {
     float score = 0.0f;
 
     if (!matches_any(lower, p.attribution)) return 0.0f;
-    score += 0.3f;
+    score += Llm09Config::AUTHORITY_BASE_SCORE;
 
-    if (has_known_authority(lower)) score += 0.2f;
-    if (matches_any(lower, p.certainty_verbs)) score += 0.2f;
-    if (has_specific_claim(lower)) score += 0.2f;
+    if (has_known_authority(lower))            score += Llm09Config::AUTHORITY_KNOWN_BONUS;
+    if (matches_any(lower, p.certainty_verbs)) score += Llm09Config::AUTHORITY_CERTAINTY_BONUS;
+    if (has_specific_claim(lower))             score += Llm09Config::AUTHORITY_CLAIM_BONUS;
 
     if (regex_search_icase(lower,
         "(according to|a study by|research from).{0,50}(confirmed|proved|showed|demonstrated).{0,50}(that|reverses|causes|cures|prevents)"))
-        score += 0.15f;
+        score += Llm09Config::AUTHORITY_REGEX_BONUS;
 
     return std::min(score, 1.0f);
 }
@@ -220,7 +222,9 @@ static float detect_temporal_precision(const std::string& lower) {
         "announced", "released", "published", "approved",
         "enacted", "signed", "decided", "ruled"
     };
-    return matches_any(lower, claim_signals) ? 0.6f : 0.2f;
+    return matches_any(lower, claim_signals)
+        ? Llm09Config::TEMPORAL_WITH_CLAIM_SCORE
+        : Llm09Config::TEMPORAL_NO_CLAIM_SCORE;
 }
 
 // Detects explicit instructions that discourage uncertainty expressions
@@ -243,19 +247,18 @@ float detect_llm09_misinformation(const std::string& prompt) {
     float s_confidence_forcing = detect_confidence_forcing(lower);
 
     // Path 1: single strong self-sufficient signal
-    constexpr float SINGLE_SIGNAL_THRESHOLD = 0.75f;
     bool single_signal_trigger =
-        s_authority          >= SINGLE_SIGNAL_THRESHOLD ||
-        s_presupposition     >= SINGLE_SIGNAL_THRESHOLD ||
-        s_fabrication        >= SINGLE_SIGNAL_THRESHOLD ||
-        s_confidence_forcing >= SINGLE_SIGNAL_THRESHOLD;
+        s_authority          >= Llm09Config::SINGLE_SIGNAL_THRESHOLD ||
+        s_presupposition     >= Llm09Config::SINGLE_SIGNAL_THRESHOLD ||
+        s_fabrication        >= Llm09Config::SINGLE_SIGNAL_THRESHOLD ||
+        s_confidence_forcing >= Llm09Config::SINGLE_SIGNAL_THRESHOLD;
 
     // Path 2: multi-signal composite
-    float composite = s_presupposition     * 0.25f
-                    + s_fabrication        * 0.25f
-                    + s_authority          * 0.35f
-                    + s_temporal           * 0.10f
-                    + s_confidence_forcing * 0.05f;
+    float composite = s_presupposition     * Llm09Config::WEIGHT_PRESUPPOSITION
+                    + s_fabrication        * Llm09Config::WEIGHT_FABRICATION
+                    + s_authority          * Llm09Config::WEIGHT_AUTHORITY
+                    + s_temporal           * Llm09Config::WEIGHT_TEMPORAL
+                    + s_confidence_forcing * Llm09Config::WEIGHT_CONFIDENCE_FORCING;
 
     int active = (s_presupposition     > 0.0f ? 1 : 0)
                + (s_fabrication        > 0.0f ? 1 : 0)
@@ -263,19 +266,18 @@ float detect_llm09_misinformation(const std::string& prompt) {
                + (s_temporal           > 0.0f ? 1 : 0)
                + (s_confidence_forcing > 0.0f ? 1 : 0);
 
-    if (active >= 3) composite *= 1.4f;
-    if (active >= 4) composite *= 1.6f;
+    if (active >= 3) composite *= Llm09Config::MULTI_SIGNAL_BOOST_3;
+    if (active >= 4) composite *= Llm09Config::MULTI_SIGNAL_BOOST_4;
 
     // Final score: take max between single-signal floor and composite
     float final_score;
     if (single_signal_trigger) {
         float strongest = std::max({s_authority, s_presupposition,
                                     s_fabrication, s_confidence_forcing});
-        final_score = std::max(strongest * 0.7f, composite);
+        final_score = std::max(strongest * Llm09Config::SINGLE_SIGNAL_FLOOR, composite);
     } else {
         final_score = composite;
     }
 
     return std::min(final_score, 1.0f);
 }
-
