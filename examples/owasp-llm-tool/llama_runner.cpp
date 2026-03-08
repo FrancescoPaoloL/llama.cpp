@@ -12,6 +12,30 @@
 #include <cctype>
 
 int run_llama(const std::string& model_path, const std::string& prompt_text) {
+
+    // Step 1: Classify prompt before loading the model
+    // Check for LLM01/02/04/05/06/09 using pattern-based classifier.
+    // If a category is found, skip LLM generation entirely — faster and semantically correct.
+    std::string category = naive_risk_classifier(prompt_text);
+
+    if (category != "unknown") {
+        printf("{\n");
+        printf("  \"prompt\": \"%s\",\n", escape_json(prompt_text).c_str());
+        printf("  \"response\": \"\",\n");
+        printf("  \"category\": \"%s\",\n", category.c_str());
+        printf("  \"status\": \"success\",\n");
+        printf("  \"metadata\": {\n");
+        printf("    \"mode\": \"skip_llm_generation\",\n");
+        printf("    \"n_prompt_tokens\": 0,\n");
+        printf("    \"n_generated_tokens\": 0,\n");
+        printf("    \"generation_time_sec\": 0.0,\n");
+        printf("    \"stop_reason\": \"n/a\"\n");
+        printf("  }\n");
+        printf("}\n");
+        return 0;
+    }
+
+    // Step 2: Load model (only if prompt is "unknown")
     llama_model_params model_params = llama_model_default_params();
     llama_model* model = llama_model_load_from_file(model_path.c_str(), model_params);
     if (!model) {
@@ -29,11 +53,12 @@ int run_llama(const std::string& model_path, const std::string& prompt_text) {
         return 1;
     }
 
+    // Step 3: Tokenize prompt
     int n_tokens = llama_tokenize(
         vocab, prompt_text.c_str(), prompt_text.size(),
         nullptr, 0, true, false
     );
-    if (n_tokens < 0) { n_tokens *= -1;}
+    if (n_tokens < 0) { n_tokens *= -1; }
 
     std::vector<llama_token> tokens(n_tokens);
     llama_tokenize(
@@ -43,6 +68,7 @@ int run_llama(const std::string& model_path, const std::string& prompt_text) {
 
     const int original_n_tokens = n_tokens;
 
+    // Step 4: Prefill — process the full prompt in one batch
     llama_batch batch = llama_batch_init(n_tokens, 0, 1);
     for (int i = 0; i < n_tokens; i++) {
         batch.token[i] = tokens[i];
@@ -60,12 +86,15 @@ int run_llama(const std::string& model_path, const std::string& prompt_text) {
 
     clock_t start = clock();
 
-    // generate tokens one by one until we reach EOS or max tokens
+    // Step 5: Autoregressive generation — one token at a time
+    // Greedy decoding: always pick the highest-scoring token at each step.
+    // This ensures deterministic, reproducible output — appropriate for a
+    // security classification tool where consistency matters more than creativity.
     for (int i = 0; i < ModelConfig::MAX_GENERATED_TOKENS; i++) {
         float* logits = llama_get_logits_ith(ctx, -1);
         int next = 0;
         for (int j = 1; j < llama_vocab_n_tokens(vocab); j++) {
-            if (logits[j] > logits[next]) { next = j;}
+            if (logits[j] > logits[next]) { next = j; }
         }
         if (next == eos) { break; }
 
@@ -85,7 +114,7 @@ int run_llama(const std::string& model_path, const std::string& prompt_text) {
 
     clock_t end = clock();
 
-    // detokenize the generated response
+    // Step 6: Detokenize response
     char buffer[ModelConfig::DETOKENIZE_BUFFER_SIZE] = {0};
     llama_detokenize(
         vocab, out_tokens.data(), out_tokens.size(),
@@ -94,35 +123,32 @@ int run_llama(const std::string& model_path, const std::string& prompt_text) {
 
     std::string response(buffer);
 
-    // Classify prompt (LLM01/02/04/06)
-    std::string category = naive_risk_classifier(prompt_text);
-
-    // Check LLM03 on the generated response
+    // Step 7: Check LLM03 (Training Data Poisoning)
+    // Only reached if no other category was detected (category == "unknown").
+    // Requires the ctx populated by generation — perplexity uses the model's
+    // internal state to measure how "surprising" the prompt is.
     bool llm03_detected = false;
     double perplexity_value = 0.0;
 
-    if (category == "unknown") {
-        // Only check LLM03 if no other category detected
-        double threshold = load_llm03_threshold("config/llm03_baseline.json");
+    double threshold = load_llm03_threshold("config/llm03_baseline.json");
 
-        // Normalize prompt: remove trailing punctuation for consistent perplexity
-        std::string normalized_prompt = prompt_text;
-        while (!normalized_prompt.empty() && std::ispunct(normalized_prompt.back())) {
-            normalized_prompt.pop_back();
-        }
+    // Normalize prompt: remove trailing punctuation for consistent perplexity
+    std::string normalized_prompt = prompt_text;
+    while (!normalized_prompt.empty() && std::ispunct(normalized_prompt.back())) {
+        normalized_prompt.pop_back();
+    }
 
-        llm03_detected = detect_llm03_poisoning(ctx, normalized_prompt, threshold);
+    llm03_detected = detect_llm03_poisoning(ctx, normalized_prompt, threshold);
 
-        if (llm03_detected) {
-            category = "LLM03";
-            // Optionally get the actual perplexity value for reporting
-            PerplexityResult result = calculate_perplexity(ctx, normalized_prompt);
-            if (result.valid) {
-                perplexity_value = result.value;
-            }
+    if (llm03_detected) {
+        category = "LLM03";
+        PerplexityResult result = calculate_perplexity(ctx, normalized_prompt);
+        if (result.valid) {
+            perplexity_value = result.value;
         }
     }
 
+    // Step 8: Output
     printf("{\n");
     printf("  \"prompt\": \"%s\",\n", escape_json(prompt_text).c_str());
     printf("  \"response\": \"%s\",\n", escape_json(response).c_str());
