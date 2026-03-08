@@ -8,9 +8,8 @@ namespace ModelConfig {
 }
 
 namespace ConfigPath {
-    static constexpr const char* KNOWN_ENTITIES = "examples/owasp-llm-tool/config/known_entities.json";
+    static constexpr const char* KNOWN_ENTITIES = "config/known_entities.json";
     static constexpr const char* LLM03_BASELINE = "config/llm03_baseline.json";
-    static constexpr const char* LLM09_PATTERNS = "examples/owasp-llm-tool/config/llm09_patterns.json";
 }
 
 namespace Llm09Config {

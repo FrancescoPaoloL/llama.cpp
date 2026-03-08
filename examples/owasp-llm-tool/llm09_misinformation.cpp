@@ -8,10 +8,7 @@
 #include <regex>
 #include <nlohmann/json.hpp>
 
-// ---------------------------------------------------------------------------
 // Patterns struct + loader
-// ---------------------------------------------------------------------------
-
 struct Llm09Patterns {
     std::vector<std::string> known_entities;
     std::vector<std::string> authorities;
@@ -111,14 +108,11 @@ static Llm09Patterns load_patterns(const std::string& path) {
 
 // Load once, keep in memory for the lifetime of the process.
 static const Llm09Patterns& get_patterns() {
-    static Llm09Patterns patterns = load_patterns(ConfigPath::LLM09_PATTERNS);
+    static Llm09Patterns patterns = load_patterns(ConfigPath::KNOWN_ENTITIES);
     return patterns;
 }
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
-
 static std::string to_lower(const std::string& s) {
     std::string result = s;
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
