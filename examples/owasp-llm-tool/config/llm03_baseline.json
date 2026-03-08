@@ -1,0 +1,10 @@
+{
+  "models": {
+    "default": {
+      "baseline_mean": 15.0,
+      "baseline_stddev": 17.5,
+      "threshold": 50.0,
+      "note": "Empirical calibration: normal=3-27, semi-anomalous=60-70, nonsense=150-450"
+    }
+  }
+}
