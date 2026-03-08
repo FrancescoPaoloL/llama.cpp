@@ -130,7 +130,7 @@ int run_llama(const std::string& model_path, const std::string& prompt_text) {
     bool llm03_detected = false;
     double perplexity_value = 0.0;
 
-    double threshold = load_llm03_threshold("config/llm03_baseline.json");
+    double threshold = load_llm03_threshold(ConfigPath::LLM03_BASELINE);
 
     // Normalize prompt: remove trailing punctuation for consistent perplexity
     std::string normalized_prompt = prompt_text;

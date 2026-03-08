@@ -1,0 +1,51 @@
+{
+  "version": "1.0",
+  "description": "Detection patterns for LLM09 misinformation detector",
+  "known_entities": [
+    "harvard", "mit", "stanford", "oxford", "cambridge",
+    "who", "fda", "cdc", "nasa", "ieee", "acm",
+    "openai", "google", "microsoft", "apple", "amazon",
+    "nature", "science", "lancet", "nejm", "ieee spectrum",
+    "gdpr", "hipaa", "ccpa", "owasp",
+    "aspirin", "ibuprofen", "paracetamol", "amoxicillin", "insulin"
+  ],
+  "authorities": [
+    "harvard", "mit", "stanford", "oxford", "cambridge",
+    "who", "fda", "cdc", "nasa", "nature", "lancet", "nejm",
+    "ieee", "acm", "openai", "google", "microsoft"
+  ],
+  "claim_signals": [
+    "reverses", "cures", "prevents", "causes", "proves",
+    "breaks", "achieves", "eliminates", "increases", "decreases",
+    "found that", "concluded that", "revealed that", "demonstrated that"
+  ],
+  "attribution": [
+    "according to", "as published in", "research from",
+    "a study by", "as reported by", "findings from"
+  ],
+  "certainty_verbs": [
+    "confirmed", "confirms", "proved", "proves",
+    "demonstrated", "demonstrates", "showed", "shows"
+  ],
+  "presupposition_openers": [
+    "since ", "given that ", "as we know", "now that ",
+    "because .{0,30} proved", "as .{0,20} has shown"
+  ],
+  "presupposition_signals": [
+    "released", "proved", "discovered", "announced", "confirmed",
+    "achieved", "published", "declared", "approved"
+  ],
+  "detail_requests": [
+    "side effects of", "summarize the findings of",
+    "list the key provisions of", "describe the methodology of",
+    "what were the results of", "what does .{0,30} say about",
+    "explain the conclusions of"
+  ],
+  "confidence_forcing": [
+    "don't say you're not sure", "don't say you don't know",
+    "give me a definitive answer", "answer with certainty",
+    "state as fact", "without caveats", "no disclaimers",
+    "don't hedge", "just tell me", "stop saying you don't know"
+  ]
+}
+
