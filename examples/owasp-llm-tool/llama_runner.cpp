@@ -12,10 +12,8 @@
 #include <cctype>
 
 int run_llama(const std::string& model_path, const std::string& prompt_text) {
-
-    // Step 1: Classify prompt before loading the model
-    // Check for LLM01/02/04/05/06/09 using pattern-based classifier.
-    // If a category is found, skip LLM generation entirely — faster and semantically correct.
+    // Step 1: Naive keyword-based classifier (no model needed).
+    // Intentionally simple to show the limits of pattern matching.
     std::string category = naive_risk_classifier(prompt_text);
 
     if (category != "unknown") {
@@ -35,7 +33,7 @@ int run_llama(const std::string& model_path, const std::string& prompt_text) {
         return 0;
     }
 
-    // Step 2: Load model (only if prompt is "unknown")
+    // Step 2: Load model
     llama_model_params model_params = llama_model_default_params();
     llama_model* model = llama_model_load_from_file(model_path.c_str(), model_params);
     if (!model) {

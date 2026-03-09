@@ -226,10 +226,8 @@ static float detect_confidence_forcing(const std::string& lower) {
     return matches_any(lower, get_patterns().confidence_forcing) ? 1.0f : 0.0f;
 }
 
-// ---------------------------------------------------------------------------
-// Orchestrator
-// ---------------------------------------------------------------------------
 
+// Orchestrator
 // Dual-path scoring: single strong signal OR multi-signal composite
 float detect_llm09_misinformation(const std::string& prompt) {
     const std::string lower = to_lower(prompt);

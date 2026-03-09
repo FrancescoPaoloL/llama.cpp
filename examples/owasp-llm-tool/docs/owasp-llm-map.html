@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>OWASP-LLM-TOOL — Architecture Map</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #080814; overflow: hidden; font-family: monospace; }
+  #toolbar {
+    position: fixed; top: 50%; right: 16px; transform: translateY(-50%);
+    display: flex; flex-direction: column; gap: 8px; z-index: 100;
+    background: #0d0d1a; border: 1px solid #222; border-radius: 6px; padding: 8px 6px;
+  }
+  #toolbar button {
+    background: #1a1a2e; border: 1px solid #333; color: #7eb8ff;
+    font-family: monospace; font-size: 12px; padding: 4px 12px;
+    border-radius: 4px; cursor: pointer;
+  }
+  #toolbar button:hover { border-color: #7eb8ff; }
+  #hint { position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%);
+    color: #333; font-size: 10px; font-family: monospace; }
+  #canvas { width: 100vw; height: 100vh; cursor: grab; }
+  #canvas:active { cursor: grabbing; }
+</style>
+</head>
+<body>
+<div id="toolbar">
+  <button onclick="zoom(1.2)">＋</button>
+  <button onclick="zoom(0.8)">－</button>
+  <button onclick="reset()">reset</button>
+</div>
+<div id="hint">scroll to zoom · drag to pan</div>
+
+<svg id="canvas" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+    <path d="M0,0 L0,6 L8,3 z" fill="#444"/>
+  </marker>
+</defs>
+<g id="scene">
+
+<!-- ===================== TITLE ===================== -->
+<text x="900" y="36" text-anchor="middle" fill="#00ff9f" font-family="monospace" font-size="15" letter-spacing="3">OWASP-LLM-TOOL — ARCHITECTURE MAP</text>
+
+<!-- ====================================================
+     COLUMN 1 (x=40): ENTRY + DETECTION
+     ==================================================== -->
+
+<!-- AREA: ENTRY  40,60  w=340 h=180 -->
+<rect x="40" y="60" width="340" height="180" rx="10" fill="#080814" stroke="#00ff9f" stroke-width="1.5" stroke-dasharray="6,3"/>
+<text x="60" y="82" fill="#00ff9f" font-family="monospace" font-size="10" letter-spacing="2">ENTRY</text>
+
+<!-- main() -->
+<rect x="60" y="92" width="300" height="56" rx="6" fill="#0d0d1a" stroke="#00ff9f" stroke-width="1.5"/>
+<text x="210" y="114" text-anchor="middle" fill="#00ff9f" font-family="monospace" font-size="11" font-weight="bold">main()</text>
+<text x="210" y="130" text-anchor="middle" fill="#555" font-family="monospace" font-size="10">argc, argv → run_llama_or_detect()</text>
+<text x="210" y="144" text-anchor="middle" fill="#6a6a9a" font-family="monospace" font-size="9">main.cpp:4</text>
+
+<!-- run_llama_or_detect() -->
+<rect x="60" y="162" width="300" height="56" rx="6" fill="#0d0d1a" stroke="#00ff9f" stroke-width="1.5"/>
+<text x="210" y="184" text-anchor="middle" fill="#00ff9f" font-family="monospace" font-size="11" font-weight="bold">run_llama_or_detect()</text>
+<text x="210" y="200" text-anchor="middle" fill="#555" font-family="monospace" font-size="10">parse argv · dispatch</text>
+<text x="210" y="214" text-anchor="middle" fill="#6a6a9a" font-family="monospace" font-size="9">llama_runner.cpp:172</text>
+
+<!-- AREA: DETECTION  40,270  w=340 h=580 -->
+<rect x="40" y="270" width="340" height="580" rx="10" fill="#080814" stroke="#ff6b9d" stroke-width="1.5" stroke-dasharray="6,3"/>
+<text x="60" y="292" fill="#ff6b9d" font-family="monospace" font-size="10" letter-spacing="2">DETECTION</text>
+
+<!-- naive_risk_classifier() -->
+<rect x="60" y="304" width="300" height="56" rx="6" fill="#0d0d1a" stroke="#ff6b9d" stroke-width="1.5"/>
+<text x="210" y="326" text-anchor="middle" fill="#ff6b9d" font-family="monospace" font-size="11" font-weight="bold">naive_risk_classifier()</text>
+<text x="210" y="342" text-anchor="middle" fill="#555" font-family="monospace" font-size="10">keyword match → LLM01/02/04/05/06/09</text>
+<text x="210" y="356" text-anchor="middle" fill="#6a6a9a" font-family="monospace" font-size="9">category.cpp:9</text>
+
+<!-- detect_llm03_poisoning() -->
+<rect x="60" y="374" width="300" height="56" rx="6" fill="#0d0d1a" stroke="#ff6b9d" stroke-width="1.5"/>
+<text x="210" y="396" text-anchor="middle" fill="#ff6b9d" font-family="monospace" font-size="11" font-weight="bold">detect_llm03_poisoning()</text>
+<text x="210" y="412" text-anchor="middle" fill="#555" font-family="monospace" font-size="10">perplexity vs threshold → bool</text>
+<text x="210" y="424" text-anchor="middle" fill="#6a6a9a" font-family="monospace" font-size="9">category.cpp:82</text>
+
+<!-- load_llm03_threshold() -->
+<rect x="60" y="444" width="300" height="56" rx="6" fill="#0d0d1a" stroke="#ff6b9d" stroke-width="1.5"/>
+<text x="210" y="466" text-anchor="middle" fill="#ff6b9d" font-family="monospace" font-size="11" font-weight="bold">load_llm03_threshold()</text>
+<text x="210" y="482" text-anchor="middle" fill="#555" font-family="monospace" font-size="10">reads llm03_baseline.json → double</text>
+<text x="210" y="494" text-anchor="middle" fill="#6a6a9a" font-family="monospace" font-size="9">category.cpp:101</text>
+
+<!-- LLM09 sub-area  60,514  w=300 h=320 -->
+<rect x="60" y="514" width="300" height="320" rx="6" fill="#0d0814" stroke="#ff6b9d" stroke-width="1" stroke-dasharray="4,2"/>
+<text x="76" y="532" fill="#ff6b9d" font-family="monospace" font-size="9" letter-spacing="1">LLM09 MISINFORMATION · llm09_misinformation.cpp</text>
+
+<!-- detect_llm09_misinformation (top, full width) -->
+<rect x="74" y="540" width="272" height="40" rx="5" fill="#0d0d1a" stroke="#c06090" stroke-width="1.5"/>
+<text x="210" y="556" text-anchor="middle" fill="#c06090" font-family="monospace" font-size="10" font-weight="bold">detect_llm09_misinformation()</text>
+<text x="210" y="570" text-anchor="middle" fill="#6a6a9a" font-family="monospace" font-size="9">llm09_misinformation.cpp:232</text>
+
+<!-- sub-detectors 2x grid -->
+<rect x="74" y="592" width="130" height="40" rx="4" fill="#0d0d1a" stroke="#884466" stroke-width="1"/>
+<text x="139" y="608" text-anchor="middle" fill="#884466" font-family="monospace" font-size="9" font-weight="bold">detect_presupposition</text>
+<text x="139" y="622" text-anchor="middle" fill="#6a6a9a" font-family="monospace" font-size="9">:161</text>
+
+<rect x="216" y="592" width="130" height="40" rx="4" fill="#0d0d1a" stroke="#884466" stroke-width="1"/>
+<text x="281" y="608" text-anchor="middle" fill="#884466" font-family="monospace" font-size="9" font-weight="bold">detect_fabrication</text>
+<text x="281" y="622" text-anchor="middle" fill="#6a6a9a" font-family="monospace" font-size="9">:176</text>
+
+<rect x="74" y="644" width="130" height="40" rx="4" fill="#0d0d1a" stroke="#884466" stroke-width="1"/>
+<text x="139" y="660" text-anchor="middle" fill="#884466" font-family="monospace" font-size="9" font-weight="bold">detect_authority</text>
+<text x="139" y="674" text-anchor="middle" fill="#6a6a9a" font-family="monospace" font-size="9">:189</text>
+
+<rect x="216" y="644" width="130" height="40" rx="4" fill="#0d0d1a" stroke="#884466" stroke-width="1"/>
+<text x="281" y="660" text-anchor="middle" fill="#884466" font-family="monospace" font-size="9" font-weight="bold">detect_temporal_prec</text>
+<text x="281" y="674" text-anchor="middle" fill="#6a6a9a" font-family="monospace" font-size="9">:208</text>
+
+<rect x="74" y="696" width="130" height="40" rx="4" fill="#0d0d1a" stroke="#884466" stroke-width="1"/>
+<text x="139" y="712" text-anchor="middle" fill="#884466" font-family="monospace" font-size="9" font-weight="bold">detect_conf_forcing</text>
+<text x="139" y="726" text-anchor="middle" fill="#6a6a9a" font-family="monospace" font-size="9">:225</text>
+
+<rect x="216" y="696" width="130" height="40" rx="4" fill="#0d0d1a" stroke="#884466" stroke-width="1"/>
+<text x="281" y="712" text-anchor="middle" fill="#884466" font-family="monospace" font-size="9" font-weight="bold">load_patterns</text>
+<text x="281" y="726" text-anchor="middle" fill="#6a6a9a" font-family="monospace" font-size="9">:71</text>
+
+<rect x="74" y="748" width="130" height="40" rx="4" fill="#0d0d1a" stroke="#664444" stroke-width="1"/>
+<text x="139" y="764" text-anchor="middle" fill="#664444" font-family="monospace" font-size="9" font-weight="bold">make_fallback_patterns</text>
+<text x="139" y="778" text-anchor="middle" fill="#6a6a9a" font-family="monospace" font-size="9">:29</text>
+
+<rect x="216" y="748" width="130" height="40" rx="4" fill="#0d0d1a" stroke="#664444" stroke-width="1"/>
+<text x="281" y="764" text-anchor="middle" fill="#664444" font-family="monospace" font-size="9" font-weight="bold">get_patterns</text>
+<text x="281" y="778" text-anchor="middle" fill="#6a6a9a" font-family="monospace" font-size="9">:110</text>
+
+<!-- ====================================================
+     COLUMN 2 (x=440): LLM PIPELINE + PERPLEXITY
+     ==================================================== -->
+
+<!-- AREA: LLM PIPELINE  440,60  w=340 h=460 -->
+<rect x="440" y="60" width="340" height="460" rx="10" fill="#080814" stroke="#7eb8ff" stroke-width="1.5" stroke-dasharray="6,3"/>
+<text x="460" y="82" fill="#7eb8ff" font-family="monospace" font-size="10" letter-spacing="2">LLM PIPELINE  llama_runner.cpp</text>
+
+<!-- run_llama() -->
+<rect x="460" y="92" width="300" height="56" rx="6" fill="#0d0d1a" stroke="#7eb8ff" stroke-width="1.5"/>
+<text x="610" y="114" text-anchor="middle" fill="#7eb8ff" font-family="monospace" font-size="11" font-weight="bold">run_llama()</text>
+<text x="610" y="130" text-anchor="middle" fill="#555" font-family="monospace" font-size="10">orchestrates full inference pipeline</text>
+<text x="610" y="144" text-anchor="middle" fill="#6a6a9a" font-family="monospace" font-size="9">llama_runner.cpp:14</text>
+
+<!-- Steps -->
+<rect x="460" y="162" width="300" height="44" rx="5" fill="#0d0d1a" stroke="#4a6a9a" stroke-width="1"/>
+<text x="610" y="180" text-anchor="middle" fill="#4a6a9a" font-family="monospace" font-size="10" font-weight="bold">① Load Model + Context</text>
+<text x="610" y="196" text-anchor="middle" fill="#444" font-family="monospace" font-size="9">llama_model_load_from_file · llama_init_from_model</text>
+
+<rect x="460" y="216" width="300" height="44" rx="5" fill="#0d0d1a" stroke="#4a6a9a" stroke-width="1"/>
+<text x="610" y="234" text-anchor="middle" fill="#4a6a9a" font-family="monospace" font-size="10" font-weight="bold">② Tokenize</text>
+<text x="610" y="250" text-anchor="middle" fill="#444" font-family="monospace" font-size="9">llama_tokenize → tokens[]</text>
+
+<rect x="460" y="270" width="300" height="44" rx="5" fill="#0d0d1a" stroke="#4a6a9a" stroke-width="1"/>
+<text x="610" y="288" text-anchor="middle" fill="#4a6a9a" font-family="monospace" font-size="10" font-weight="bold">③ Prefill</text>
+<text x="610" y="304" text-anchor="middle" fill="#444" font-family="monospace" font-size="9">llama_batch_init · llama_decode(ctx, batch)</text>
+
+<rect x="460" y="324" width="300" height="44" rx="5" fill="#0d0d1a" stroke="#4a6a9a" stroke-width="1"/>
+<text x="610" y="342" text-anchor="middle" fill="#4a6a9a" font-family="monospace" font-size="10" font-weight="bold">④ Autoregressive Generation</text>
+<text x="610" y="358" text-anchor="middle" fill="#444" font-family="monospace" font-size="9">greedy decoding · EOS or MAX_TOKENS</text>
+
+<rect x="460" y="378" width="300" height="44" rx="5" fill="#0d0d1a" stroke="#4a6a9a" stroke-width="1"/>
+<text x="610" y="396" text-anchor="middle" fill="#4a6a9a" font-family="monospace" font-size="10" font-weight="bold">⑤ Detokenize</text>
+<text x="610" y="412" text-anchor="middle" fill="#444" font-family="monospace" font-size="9">llama_detokenize → string</text>
+
+<rect x="460" y="432" width="300" height="44" rx="5" fill="#0d0d1a" stroke="#4a6a9a" stroke-width="1"/>
+<text x="610" y="450" text-anchor="middle" fill="#4a6a9a" font-family="monospace" font-size="10" font-weight="bold">⑥ LLM03 check</text>
+<text x="610" y="466" text-anchor="middle" fill="#444" font-family="monospace" font-size="9">detect_llm03_poisoning() after generation</text>
+
+<!-- AREA: PERPLEXITY  440,540  w=340 h=200 -->
+<rect x="440" y="540" width="340" height="200" rx="10" fill="#080814" stroke="#ffd166" stroke-width="1.5" stroke-dasharray="6,3"/>
+<text x="460" y="562" fill="#ffd166" font-family="monospace" font-size="10" letter-spacing="2">PERPLEXITY  perplexity_utils.cpp</text>
+
+<!-- calculate_perplexity() -->
+<rect x="460" y="574" width="300" height="56" rx="6" fill="#0d0d1a" stroke="#ffd166" stroke-width="1.5"/>
+<text x="610" y="596" text-anchor="middle" fill="#ffd166" font-family="monospace" font-size="11" font-weight="bold">calculate_perplexity()</text>
+<text x="610" y="612" text-anchor="middle" fill="#555" font-family="monospace" font-size="10">ctx + prompt → PerplexityResult</text>
+<text x="610" y="626" text-anchor="middle" fill="#6a6a9a" font-family="monospace" font-size="9">perplexity_utils.cpp:45</text>
+
+<!-- softmax + log_softmax -->
+<rect x="460" y="644" width="142" height="56" rx="5" fill="#0d0d1a" stroke="#a08820" stroke-width="1"/>
+<text x="531" y="666" text-anchor="middle" fill="#a08820" font-family="monospace" font-size="10" font-weight="bold">softmax()</text>
+<text x="531" y="682" text-anchor="middle" fill="#444" font-family="monospace" font-size="9">logits → probs</text>
+<text x="531" y="694" text-anchor="middle" fill="#6a6a9a" font-family="monospace" font-size="9">:10</text>
+
+<rect x="618" y="644" width="142" height="56" rx="5" fill="#0d0d1a" stroke="#a08820" stroke-width="1"/>
+<text x="689" y="666" text-anchor="middle" fill="#a08820" font-family="monospace" font-size="10" font-weight="bold">log_softmax()</text>
+<text x="689" y="682" text-anchor="middle" fill="#444" font-family="monospace" font-size="9">logits + tok → log prob</text>
+<text x="689" y="694" text-anchor="middle" fill="#6a6a9a" font-family="monospace" font-size="9">:29</text>
+
+<!-- ====================================================
+     COLUMN 3 (x=840): I/O, CONFIG, EXTERNAL
+     ==================================================== -->
+
+<!-- AREA: I/O & UTILS  840,60  w=320 h=180 -->
+<rect x="840" y="60" width="320" height="180" rx="10" fill="#080814" stroke="#c084fc" stroke-width="1.5" stroke-dasharray="6,3"/>
+<text x="860" y="82" fill="#c084fc" font-family="monospace" font-size="10" letter-spacing="2">I/O &amp; UTILS</text>
+
+<rect x="860" y="92" width="280" height="56" rx="6" fill="#0d0d1a" stroke="#c084fc" stroke-width="1.5"/>
+<text x="1000" y="114" text-anchor="middle" fill="#c084fc" font-family="monospace" font-size="11" font-weight="bold">escape_json()</text>
+<text x="1000" y="130" text-anchor="middle" fill="#555" font-family="monospace" font-size="10">sanitize string for JSON output</text>
+<text x="1000" y="144" text-anchor="middle" fill="#6a6a9a" font-family="monospace" font-size="9">json_utils.cpp:4</text>
+
+<rect x="860" y="162" width="280" height="56" rx="6" fill="#0d0d1a" stroke="#c084fc" stroke-width="1.5"/>
+<text x="1000" y="184" text-anchor="middle" fill="#c084fc" font-family="monospace" font-size="11" font-weight="bold">JSON output (printf)</text>
+<text x="1000" y="200" text-anchor="middle" fill="#555" font-family="monospace" font-size="10">stdout · prompt / response / category</text>
+<text x="1000" y="214" text-anchor="middle" fill="#6a6a9a" font-family="monospace" font-size="9">llama_runner.cpp · inline</text>
+
+<!-- AREA: CONFIG  840,260  w=320 h=220 -->
+<rect x="840" y="260" width="320" height="220" rx="10" fill="#080814" stroke="#888" stroke-width="1.5" stroke-dasharray="6,3"/>
+<text x="860" y="282" fill="#888" font-family="monospace" font-size="10" letter-spacing="2">CONFIG</text>
+
+<rect x="860" y="294" width="280" height="56" rx="6" fill="#0d0d1a" stroke="#666" stroke-width="1.5"/>
+<text x="1000" y="316" text-anchor="middle" fill="#888" font-family="monospace" font-size="11" font-weight="bold">config.h</text>
+<text x="1000" y="332" text-anchor="middle" fill="#555" font-family="monospace" font-size="10">ModelConfig · ConfigPath constants</text>
+<text x="1000" y="344" text-anchor="middle" fill="#6a6a9a" font-family="monospace" font-size="9">compile-time constants</text>
+
+<rect x="860" y="364" width="130" height="56" rx="6" fill="#0d0d1a" stroke="#555" stroke-width="1"/>
+<text x="925" y="386" text-anchor="middle" fill="#777" font-family="monospace" font-size="10" font-weight="bold">llm03_baseline</text>
+<text x="925" y="402" text-anchor="middle" fill="#777" font-family="monospace" font-size="10" font-weight="bold">.json</text>
+<text x="925" y="414" text-anchor="middle" fill="#6a6a9a" font-family="monospace" font-size="9">config/</text>
+
+<rect x="1010" y="364" width="130" height="56" rx="6" fill="#0d0d1a" stroke="#555" stroke-width="1"/>
+<text x="1075" y="386" text-anchor="middle" fill="#777" font-family="monospace" font-size="10" font-weight="bold">known_entities</text>
+<text x="1075" y="402" text-anchor="middle" fill="#777" font-family="monospace" font-size="10" font-weight="bold">.json</text>
+<text x="1075" y="414" text-anchor="middle" fill="#6a6a9a" font-family="monospace" font-size="9">config/</text>
+
+<!-- AREA: EXTERNAL  840,500  w=320 h=120 -->
+<rect x="840" y="500" width="320" height="120" rx="10" fill="#080814" stroke="#555" stroke-width="1.5" stroke-dasharray="6,3"/>
+<text x="860" y="522" fill="#555" font-family="monospace" font-size="10" letter-spacing="2">EXTERNAL</text>
+
+<rect x="860" y="534" width="280" height="56" rx="6" fill="#0d0d1a" stroke="#444" stroke-width="1.5"/>
+<text x="1000" y="556" text-anchor="middle" fill="#666" font-family="monospace" font-size="11" font-weight="bold">json.hpp</text>
+<text x="1000" y="572" text-anchor="middle" fill="#444" font-family="monospace" font-size="10">nlohmann/json · header-only</text>
+<text x="1000" y="584" text-anchor="middle" fill="#6a6a9a" font-family="monospace" font-size="9">external/json.hpp</text>
+
+<!-- ====================================================
+     ARROWS
+     ==================================================== -->
+
+<!-- main → run_llama_or_detect -->
+<line x1="210" y1="148" x2="210" y2="162" stroke="#00ff9f" stroke-width="1.5" marker-end="url(#arr)"/>
+
+<!-- run_llama_or_detect → naive_risk_classifier -->
+<line x1="210" y1="218" x2="210" y2="304" stroke="#555" stroke-width="1.5" marker-end="url(#arr)"/>
+
+<!-- run_llama_or_detect → run_llama (horizontal right) -->
+<line x1="380" y1="190" x2="440" y2="120" stroke="#555" stroke-width="1.5" marker-end="url(#arr)"/>
+<text x="416" y="148" text-anchor="middle" fill="#555" font-family="monospace" font-size="9">no skip</text>
+
+<!-- naive_risk_classifier → detect_llm03 -->
+<line x1="210" y1="360" x2="210" y2="374" stroke="#ff6b9d" stroke-width="1" marker-end="url(#arr)"/>
+
+<!-- detect_llm03 → load_llm03_threshold -->
+<line x1="210" y1="430" x2="210" y2="444" stroke="#ff6b9d" stroke-width="1" marker-end="url(#arr)"/>
+
+<!-- load_llm03_threshold → detect_llm09 area -->
+<line x1="210" y1="500" x2="210" y2="514" stroke="#ff6b9d" stroke-width="1" marker-end="url(#arr)"/>
+
+<!-- run_llama step6 → detect_llm03 (dashed) -->
+<line x1="460" y1="454" x2="360" y2="402" stroke="#555" stroke-width="1" stroke-dasharray="4,2" marker-end="url(#arr)"/>
+
+<!-- detect_llm03 → calculate_perplexity (dashed) -->
+<line x1="310" y1="402" x2="440" y2="600" stroke="#555" stroke-width="1" stroke-dasharray="4,2" marker-end="url(#arr)"/>
+
+<!-- load_llm03_threshold → llm03_baseline.json (dashed) -->
+<line x1="360" y1="466" x2="860" y2="392" stroke="#666" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#arr)"/>
+
+<!-- load_patterns → known_entities.json (dashed) -->
+<line x1="360" y1="712" x2="1010" y2="406" stroke="#666" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#arr)"/>
+
+<!-- run_llama → escape_json (dashed) -->
+<line x1="760" y1="120" x2="860" y2="120" stroke="#555" stroke-width="1" stroke-dasharray="4,2" marker-end="url(#arr)"/>
+
+<!-- load_patterns → json.hpp (dashed) -->
+<line x1="346" y1="726" x2="840" y2="560" stroke="#444" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#arr)"/>
+
+<!-- ====================================================
+     LEGEND
+     ==================================================== -->
+<rect x="40" y="878" width="760" height="36" rx="6" fill="#0a0a18" stroke="#222" stroke-width="1"/>
+<rect x="58" y="890" width="10" height="10" fill="#00ff9f" rx="2"/>
+<text x="74" y="899" fill="#666" font-family="monospace" font-size="9">entry</text>
+<rect x="130" y="890" width="10" height="10" fill="#ff6b9d" rx="2"/>
+<text x="146" y="899" fill="#666" font-family="monospace" font-size="9">detection</text>
+<rect x="240" y="890" width="10" height="10" fill="#7eb8ff" rx="2"/>
+<text x="256" y="899" fill="#666" font-family="monospace" font-size="9">llm pipeline</text>
+<rect x="370" y="890" width="10" height="10" fill="#ffd166" rx="2"/>
+<text x="386" y="899" fill="#666" font-family="monospace" font-size="9">perplexity</text>
+<rect x="470" y="890" width="10" height="10" fill="#c084fc" rx="2"/>
+<text x="486" y="899" fill="#666" font-family="monospace" font-size="9">i/o &amp; utils</text>
+<rect x="570" y="890" width="10" height="10" fill="#888" rx="2"/>
+<text x="586" y="899" fill="#666" font-family="monospace" font-size="9">config</text>
+<rect x="650" y="890" width="10" height="10" fill="#555" rx="2"/>
+<text x="666" y="899" fill="#666" font-family="monospace" font-size="9">external</text>
+
+</g>
+</svg>
+
+<script>
+  const scene = document.getElementById('scene');
+  let scale = 1, tx = 0, ty = 0;
+  let dragging = false, startX, startY, startTx, startTy;
+
+  function apply() {
+    scene.setAttribute('transform', `translate(${tx},${ty}) scale(${scale})`);
+  }
+  function zoom(factor) {
+    scale *= factor;
+    scale = Math.min(Math.max(scale, 0.1), 5);
+    apply();
+  }
+  function reset() {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    scale = Math.min(vw / 1200, vh / 940) * 0.9;
+    tx = (vw - 1200 * scale) / 2;
+    ty = (vh - 940 * scale) / 2;
+    apply();
+  }
+  reset();
+
+  document.getElementById('canvas').addEventListener('wheel', e => {
+    e.preventDefault();
+    zoom(e.deltaY < 0 ? 1.1 : 0.9);
+  }, { passive: false });
+  document.getElementById('canvas').addEventListener('mousedown', e => {
+    dragging = true; startX = e.clientX; startY = e.clientY;
+    startTx = tx; startTy = ty;
+  });
+  document.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    tx = startTx + (e.clientX - startX);
+    ty = startTy + (e.clientY - startY);
+    apply();
+  });
+  document.addEventListener('mouseup', () => dragging = false);
+</script>
+</body>
+</html>
