@@ -1,8 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 project(owasp-llm-tool CXX)
 
-set(CMAKE_BUILD_TYPE Debug CACHE STRING "" FORCE)
-set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
 
 include_directories(${CMAKE_SOURCE_DIR}/external)
 
