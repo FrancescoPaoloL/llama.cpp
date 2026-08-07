@@ -16,7 +16,7 @@ add_executable(owasp-llm-tool
 target_link_libraries(owasp-llm-tool
     PRIVATE
         llama
-        common
+        llama-common
 )
 
 target_compile_features(owasp-llm-tool PRIVATE cxx_std_11)
