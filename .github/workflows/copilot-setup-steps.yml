@@ -26,10 +26,10 @@ jobs:
     # If you do not check out your code, Copilot will do this for you.
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: ccache
-        uses: ggml-org/ccache-action@v1.2.16
+        uses: ggml-org/ccache-action@v1.2.21
         with:
           key: copilot-setup-steps
           evict-old-files: 1d
@@ -45,13 +45,12 @@ jobs:
           sudo chmod +x /usr/local/bin/git-clang-format
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
       - name: Install Python dependencies
         run: |
           python3 -m venv .venv
-          .venv/bin/activate
+          source .venv/bin/activate
           pip install -r requirements/requirements-all.txt -r tools/server/tests/requirements.txt
-          pip install flake8 pyright pre-commit

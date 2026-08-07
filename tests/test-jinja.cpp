@@ -4,10 +4,12 @@
 #include <cstdlib>
 
 #include <nlohmann/json.hpp>
+#include "subproc.h"
 
 #include "jinja/runtime.h"
 #include "jinja/parser.h"
 #include "jinja/lexer.h"
+#include "jinja/utils.h"
 
 #include "testing.h"
 
@@ -29,14 +31,28 @@ static void test_tests(testing & t);
 static void test_string_methods(testing & t);
 static void test_array_methods(testing & t);
 static void test_object_methods(testing & t);
+static void test_hasher(testing & t);
+static void test_stats(testing & t);
 static void test_fuzzing(testing & t);
+
+static bool g_python_mode = false;
 
 int main(int argc, char *argv[]) {
     testing t(std::cout);
     t.verbose = true;
 
-    if (argc >= 2) {
-        t.set_filter(argv[1]);
+    // usage: test-jinja [-py] [filter_regex]
+    //  -py : enable python mode (use python jinja2 for rendering expected output)
+    //        only use this for cross-checking, not for correctness
+    //        note: the implementation of this flag is basic, only intented to be used by maintainers
+
+    for (int i = 1; i < argc; i++) {
+        std::string arg = argv[i];
+        if (arg == "-py") {
+            g_python_mode = true;
+        } else {
+            t.set_filter(arg);
+        }
     }
 
     t.test("whitespace control", test_whitespace_control);
@@ -53,7 +69,11 @@ int main(int argc, char *argv[]) {
     t.test("string methods", test_string_methods);
     t.test("array methods", test_array_methods);
     t.test("object methods", test_object_methods);
-    t.test("fuzzing", test_fuzzing);
+    if (!g_python_mode) {
+        t.test("hasher", test_hasher);
+        t.test("stats", test_stats);
+        t.test("fuzzing", test_fuzzing);
+    }
 
     return t.summary();
 }
@@ -141,6 +161,18 @@ static void test_conditionals(testing & t) {
         "big"
     );
 
+    test_template(t, "object comparison",
+        "{% if {0: 1, none: 2, 1.0: 3, '0': 4, true: 5} == {false: 1, none: 2, 1: 5, '0': 4} %}equal{% endif %}",
+        json::object(),
+        "equal"
+    );
+
+    test_template(t, "array comparison",
+        "{% if [0, 1.0, false] == [false, 1, 0.0] %}equal{% endif %}",
+        json::object(),
+        "equal"
+    );
+
     test_template(t, "logical and",
         "{% if a and b %}both{% endif %}",
         {{"a", true}, {"b", true}},
@@ -159,9 +191,21 @@ static void test_conditionals(testing & t) {
         "negated"
     );
 
-    test_template(t, "in operator",
+    test_template(t, "in operator (element in array)",
         "{% if 'x' in items %}found{% endif %}",
         {{"items", json::array({"x", "y"})}},
+        "found"
+    );
+
+    test_template(t, "in operator (substring)",
+        "{% if 'bc' in 'abcd' %}found{% endif %}",
+        json::object(),
+        "found"
+    );
+
+    test_template(t, "in operator (object key)",
+        "{% if 'key' in obj %}found{% endif %}",
+        {{"obj", {{"key", 1}, {"other", 2}}}},
         "found"
     );
 
@@ -174,6 +218,84 @@ static void test_conditionals(testing & t) {
     test_template(t, "is not defined",
         "{% if y is not defined %}yes{% else %}no{% endif %}",
         json::object(),
+        "yes"
+    );
+
+    test_template(t, "is undefined falsy",
+        "{{ 'yes' if not y else 'no' }}",
+        json::object(),
+        "yes"
+    );
+
+    test_template(t, "is undefined attribute falsy",
+        "{{ 'yes' if not y.x else 'no' }}",
+        {{"y", true}},
+        "yes"
+    );
+
+    test_template(t, "is undefined key falsy",
+        "{{ 'yes' if not y['x'] else 'no' }}",
+        {{"y", {{}}}},
+        "yes"
+    );
+
+    test_template(t, "is empty array falsy",
+        "{{ 'yes' if not y else 'no' }}",
+        {{"y", json::array()}},
+        "yes"
+    );
+
+    test_template(t, "is empty object falsy",
+        "{{ 'yes' if not y else 'no' }}",
+        {{"y", json::object()}},
+        "yes"
+    );
+
+    test_template(t, "is empty string falsy",
+        "{{ 'yes' if not y else 'no' }}",
+        {{"y", ""}},
+        "yes"
+    );
+
+    test_template(t, "is 0 falsy",
+        "{{ 'yes' if not y else 'no' }}",
+        {{"y", 0}},
+        "yes"
+    );
+
+    test_template(t, "is 0.0 falsy",
+        "{{ 'yes' if not y else 'no' }}",
+        {{"y", 0.0}},
+        "yes"
+    );
+
+    test_template(t, "is non-empty array truthy",
+        "{{ 'yes' if y else 'no' }}",
+        {{"y", json::array({""})}},
+        "yes"
+    );
+
+    test_template(t, "is non-empty object truthy",
+        "{{ 'yes' if y else 'no' }}",
+        {{"y", {"x", false}}},
+        "yes"
+    );
+
+    test_template(t, "is non-empty string truthy",
+        "{{ 'yes' if y else 'no' }}",
+        {{"y", "0"}},
+        "yes"
+    );
+
+    test_template(t, "is 1 truthy",
+        "{{ 'yes' if y else 'no' }}",
+        {{"y", 1}},
+        "yes"
+    );
+
+    test_template(t, "is 1.0 truthy",
+        "{{ 'yes' if y else 'no' }}",
+        {{"y", 1.0}},
         "yes"
     );
 }
@@ -221,6 +343,12 @@ static void test_loops(testing & t) {
         "empty"
     );
 
+    test_template(t, "for undefined empty",
+        "{% for i in items %}{{ i }}{% else %}empty{% endfor %}",
+        json::object(),
+        "empty"
+    );
+
     test_template(t, "nested for",
         "{% for i in a %}{% for j in b %}{{ i }}{{ j }}{% endfor %}{% endfor %}",
         {{"a", json::array({1, 2})}, {"b", json::array({"x", "y"})}},
@@ -247,16 +375,82 @@ static void test_expressions(testing & t) {
         "Bob"
     );
 
+    test_template(t, "negative float (not dot notation)",
+        "{{ -1.0 }}",
+        json::object(),
+        "-1.0"
+    );
+
     test_template(t, "bracket notation",
         "{{ user['name'] }}",
         {{"user", {{"name", "Bob"}}}},
         "Bob"
     );
 
+    test_template(t, "empty computed member defaults to undefined",
+        "{{ a[]|default('fallback') }}",
+        {{"a", {{"name", "Bob"}}}},
+        "fallback"
+    );
+
+    test_template(t, "empty computed member is undefined",
+        "{{ a[] is undefined }}",
+        {{"a", {{"name", "Bob"}}}},
+        "True"
+    );
+
+    test_template(t, "undefined computed member is undefined",
+        "{{ a[undefined] is undefined }}",
+        {{"a", {{"name", "Bob"}}}},
+        "True"
+    );
+
     test_template(t, "array access",
         "{{ items[1] }}",
         {{"items", json::array({"a", "b", "c"})}},
         "b"
+    );
+
+    test_template(t, "array negative access",
+        "{{ items[-1] }}",
+        {{"items", json::array({"a", "b", "c"})}},
+        "c"
+    );
+
+    test_template(t, "array slice",
+        "{{ items[1:-1]|string }}",
+        {{"items", json::array({"a", "b", "c"})}},
+        "['b']"
+    );
+
+    test_template(t, "array slice step",
+        "{{ items[::2]|string }}",
+        {{"items", json::array({"a", "b", "c"})}},
+        "['a', 'c']"
+    );
+
+    test_template(t, "tuple slice",
+        "{{ ('a', 'b', 'c')[::-1]|string }}",
+        json::object(),
+        "('c', 'b', 'a')"
+    );
+
+    test_template(t, "string slice negative step",
+        "{{ 'abcdef'[::-2] }}",
+        json::object(),
+        "fdb"
+    );
+
+    test_template(t, "string slice negative start and step",
+        "{{ 'abcdef'[-1:1:-1] }}",
+        json::object(),
+        "fedc"
+    );
+
+    test_template(t, "string slice negative start, stop and step",
+        "{{ 'abcdef'[-1:-5:-1] }}",
+        json::object(),
+        "fedc"
     );
 
     test_template(t, "arithmetic",
@@ -269,6 +463,18 @@ static void test_expressions(testing & t) {
         "{{ 'hello' ~ ' ' ~ 'world' }}",
         json::object(),
         "hello world"
+    );
+
+    test_template(t, "string repetition",
+        "{{ 'ab' * 3 }}",
+        json::object(),
+        "ababab"
+    );
+
+    test_template(t, "reversed string repetition",
+        "{{ 3 * 'ab' }}",
+        json::object(),
+        "ababab"
     );
 
     test_template(t, "ternary",
@@ -302,6 +508,36 @@ static void test_set_statement(testing & t) {
         json::object(),
         "1"
     );
+
+    test_template(t, "set dict with mixed type keys",
+        "{% set d = {0: 1, none: 2, 1.0: 3, '0': 4, (0, 0): 5, false: 6, 1: 7} %}{{ d[(0, 0)] + d[0] + d[none] + d['0'] + d[false] + d[1.0] + d[1] }}",
+        json::object(),
+        "37"
+    );
+
+    test_template(t, "print dict with mixed type keys",
+        "{% set d = {0: 1, none: 2, 1.0: 3, '0': 4, (0, 0): 5, true: 6} %}{{ d|string }}",
+        json::object(),
+        "{0: 1, None: 2, 1.0: 6, '0': 4, (0, 0): 5}"
+    );
+
+    test_template(t, "print array with mixed types",
+        "{% set d = [0, none, 1.0, '0', true, (0, 0)] %}{{ d|string }}",
+        json::object(),
+        "[0, None, 1.0, '0', True, (0, 0)]"
+    );
+
+    test_template(t, "object member assignment with mixed key types",
+        "{% set d = namespace() %}{% set d.a = 123 %}{{ d['a'] == 123 }}",
+        json::object(),
+        "True"
+    );
+
+    test_template(t, "tuple unpacking",
+        "{% set t = (1, 2, 3) %}{% set a, b, c = t %}{{ a + b + c }}",
+        json::object(),
+        "6"
+    );
 }
 
 static void test_filters(testing & t) {
@@ -315,6 +551,18 @@ static void test_filters(testing & t) {
         "{{ 'HELLO'|lower }}",
         json::object(),
         "hello"
+    );
+
+    test_template(t, "upper array",
+        "{{ items|upper }}",
+        {{"items", json::array({"hello", "world"})}},
+        "['HELLO', 'WORLD']"
+    );
+
+    test_template(t, "upper dict",
+        "{{ items|upper }}",
+        {{"items", {{"hello", "world"}}}},
+        "{'HELLO': 'WORLD'}"
     );
 
     test_template(t, "capitalize",
@@ -353,8 +601,8 @@ static void test_filters(testing & t) {
         "hello jinja"
     );
 
-    test_template(t, "length list",
-        "{{ items|length }}",
+    test_template(t, "length (count alias) list",
+        "{{ items|count }}",
         {{"items", json::array({1, 2, 3})}},
         "3"
     );
@@ -381,6 +629,32 @@ static void test_filters(testing & t) {
         "{% for i in items|sort %}{{ i }}{% endfor %}",
         {{"items", json::array({3, 1, 2})}},
         "123"
+    );
+
+    test_template(t, "sort reverse",
+        "{% for i in items|sort(true) %}{{ i }}{% endfor %}",
+        {{"items", json::array({3, 1, 2})}},
+        "321"
+    );
+
+    test_template(t, "sort with attribute",
+        "{{ items|sort(attribute='name')|join(attribute='age') }}",
+        {{"items", json::array({
+            json({{"name", "c"}, {"age", 3}}),
+            json({{"name", "a"}, {"age", 1}}),
+            json({{"name", "b"}, {"age", 2}}),
+        })}},
+        "123"
+    );
+
+    test_template(t, "sort with numeric attribute",
+        "{{ items|sort(attribute=0)|join(attribute=1) }}",
+        {{"items", json::array({
+            json::array({3, "z"}),
+            json::array({1, "x"}),
+            json::array({2, "y"}),
+        })}},
+        "xyz"
     );
 
     test_template(t, "join",
@@ -437,8 +711,8 @@ static void test_filters(testing & t) {
         "fallback"
     );
 
-    test_template(t, "default with falsy value",
-        "{{ ''|default('fallback', true) }}",
+    test_template(t, "default (d alias) with falsy value",
+        "{{ ''|d('fallback', true) }}",
         json::object(),
         "fallback"
     );
@@ -447,6 +721,33 @@ static void test_filters(testing & t) {
         "{{ data|tojson(ensure_ascii=true) }}",
         {{"data", "\u2713"}},
         "\"\\u2713\""
+    );
+
+    test_template(t, "tojson ensure_ascii=true nested object",
+        "{{ data|tojson(ensure_ascii=true) }}",
+        {{"data", {
+            {"text", "\u2713"},
+            {"items", json::array({"é", {{"snowman", "☃"}}})}
+        }}},
+        "{\"text\": \"\\u2713\", \"items\": [\"\\u00e9\", {\"snowman\": \"\\u2603\"}]}"
+    );
+
+    test_template(t, "tojson ensure_ascii=true indent=2",
+        "{{ data|tojson(ensure_ascii=true, indent=2) }}",
+        {{"data", {
+            {"text", "\u2713"},
+            {"nested", {{"accent", "é"}}}
+        }}},
+        "{\n  \"text\": \"\\u2713\",\n  \"nested\": {\n    \"accent\": \"\\u00e9\"\n  }\n}"
+    );
+
+    test_template(t, "tojson ensure_ascii=true preserves existing escapes",
+        "{{ data|tojson(ensure_ascii=true) }}",
+        {{"data", {
+            {"emoji", "😀"},
+            {"line", "a\nb"}
+        }}},
+        "{\"emoji\": \"\\ud83d\\ude00\", \"line\": \"a\\nb\"}"
     );
 
     test_template(t, "tojson sort_keys=true",
@@ -479,10 +780,64 @@ static void test_filters(testing & t) {
         "{\n  \"a\": 1,\n  \"b\": [\n    1,\n    2\n  ]\n}"
     );
 
+    test_template(t, "indent",
+        "{{ data|indent(2) }}",
+        {{ "data", "foo\nbar" }},
+        "foo\n  bar"
+    );
+
+    test_template(t, "indent first only",
+        "{{ data|indent(width=3,first=true) }}",
+        {{ "data", "foo\nbar" }},
+        "   foo\n   bar"
+    );
+
+    test_template(t, "indent blank lines and first line",
+        "{{ data|indent(width=5,blank=true,first=true) }}",
+        {{ "data", "foo\n\nbar" }},
+        "     foo\n     \n     bar"
+    );
+
+    test_template(t, "indent with default width",
+        "{{ data|indent() }}",
+        {{ "data", "foo\nbar" }},
+        "foo\n    bar"
+    );
+
+    test_template(t, "indent with no newline",
+        "{{ data|indent }}",
+        {{ "data", "foo" }},
+        "foo"
+    );
+
+    test_template(t, "indent with trailing newline",
+        "{{ data|indent(blank=true) }}",
+        {{ "data", "foo\n" }},
+        "foo\n    "
+    );
+
+    test_template(t, "indent with string",
+        "{{ data|indent(width='>>>>') }}",
+        {{ "data", "foo\nbar" }},
+        "foo\n>>>>bar"
+    );
+
     test_template(t, "chained filters",
         "{{ '  HELLO  '|trim|lower }}",
         json::object(),
         "hello"
+    );
+
+    test_template(t, "int filter on integer is identity",
+        "{{ value|int }}",
+        {{"value", 7}},
+        "7"
+    );
+
+    test_template(t, "none to string",
+        "{{ x|string }}",
+        {{"x", nullptr}},
+        "None"
     );
 }
 
@@ -534,6 +889,66 @@ static void test_literals(testing & t) {
         json::object(),
         "1"
     );
+
+    test_template(t, "integer|abs",
+        "{{ -42 | abs }}",
+        json::object(),
+        "42"
+    );
+
+    test_template(t, "integer|float",
+        "{{ 42 | float }}",
+        json::object(),
+        "42.0"
+    );
+
+    test_template(t, "integer|tojson",
+        "{{ 42 | tojson }}",
+        json::object(),
+        "42"
+    );
+
+    test_template(t, "float|abs",
+        "{{ -3.14 | abs }}",
+        json::object(),
+        "3.14"
+    );
+
+    test_template(t, "float|int",
+        "{{ 3.14 | int }}",
+        json::object(),
+        "3"
+    );
+
+    test_template(t, "float|tojson",
+        "{{ 3.14 | tojson }}",
+        json::object(),
+        "3.14"
+    );
+
+    test_template(t, "string|tojson",
+        "{{ 'hello' | tojson }}",
+        json::object(),
+        "\"hello\""
+    );
+
+    test_template(t, "boolean|int",
+        "{{ true | int }}",
+        json::object(),
+        "1"
+    );
+
+    test_template(t, "boolean|float",
+        "{{ true | float }}",
+        json::object(),
+        "1.0"
+    );
+
+    test_template(t, "boolean|tojson",
+        "{{ true | tojson }}",
+        json::object(),
+        "true"
+    );
 }
 
 static void test_comments(testing & t) {
@@ -561,6 +976,50 @@ static void test_macros(testing & t) {
         "{% macro greet(name='Guest') %}Hi {{ name }}{% endmacro %}{{ greet() }}",
         json::object(),
         "Hi Guest"
+    );
+
+    test_template(t, "macro kwargs input",
+        "{% macro my_func(a, b=False) %}{% if b %}{{ a }}{% else %}nope{% endif %}{% endmacro %}{{ my_func(1, b=True) }}",
+        json::object(),
+        "1"
+    );
+
+    test_template(t, "macro with multiple args",
+        "{% macro add(a, b, c=0) %}{{ a + b + c }}{% endmacro %}{{ add(1, 2) }},{{ add(1, 2, 3) }},{{ add(1, b=10) }},{{ add(1, 2, c=5) }}",
+        json::object(),
+        "3,6,11,8"
+    );
+
+    test_template(t, "macro with kwarg out-of-order input",
+        "{% macro greet(first, last, greeting='Hello') %}{{ greeting }}, {{ first }} {{ last }}{% endmacro %}{{ greet(last='Smith', first='John') }},{{ greet(last='Doe', greeting='Hi', first='Jane') }}",
+        json::object(),
+        "Hello, John Smith,Hi, Jane Doe"
+    );
+
+    test_template(t, "macro with caller",
+        "\
+{%- macro nest_dict(o, i, ff='') %}\n\
+  {{- caller(ff) }}\n\
+  {%- for k, v in o|items %}\n\
+    {{- i + k + ': ' }}\n\
+    {%- if v is mapping %}\n\
+      {{- '{' }}\n\
+      {% call(f) nest_dict(v, i + '    ') %}\n\
+        {{- 'fail' if ff is undefined }}\n\
+      {%- endcall %}\n\
+      {{- i + '}' }}\n\
+    {% else %}\n\
+      {{- v|string }}\n\
+    {% endif %}\n\
+  {%- endfor %}\n\
+{%- endmacro %}\n\
+{%- call(f) nest_dict({'root1': 1, 'root2': {'nest1': 1, 'nest2': {'nest3': 2}}}, '    ', 'Dict') %}\n\
+  {{- 'fail' if ff is defined }}\n\
+  {{- f + ' {' }}\n\
+{% endcall %}\n\
+{{- '}' }}",
+        json::object(),
+        "Dict {\n    root1: 1\n    root2: {\n        nest1: 1\n        nest2: {\n            nest3: 2\n        }\n    }\n}"
     );
 }
 
@@ -758,6 +1217,54 @@ static void test_tests(testing & t) {
         {{"x", {{"a", 1}}}},
         "yes"
     );
+
+    test_template(t, "undefined is sequence",
+        "{{ 'yes' if x is sequence }}",
+        json::object(),
+        "yes"
+    );
+
+    test_template(t, "undefined is iterable",
+        "{{ 'yes' if x is iterable }}",
+        json::object(),
+        "yes"
+    );
+
+    test_template(t, "is in (array, true)",
+        "{{ 'yes' if 2 is in([1, 2, 3]) }}",
+        json::object(),
+        "yes"
+    );
+
+    test_template(t, "is in (array, false)",
+        "{{ 'yes' if 5 is in([1, 2, 3]) else 'no' }}",
+        json::object(),
+        "no"
+    );
+
+    test_template(t, "is in (string)",
+        "{{ 'yes' if 'bc' is in('abcde') }}",
+        json::object(),
+        "yes"
+    );
+
+    test_template(t, "is in (object keys)",
+        "{{ 'yes' if 'a' is in(obj) }}",
+        {{"obj", {{"a", 1}, {"b", 2}}}},
+        "yes"
+    );
+
+    test_template(t, "reject with in test",
+        "{{ items | reject('in', skip) | join(', ') }}",
+        {{"items", json::array({"a", "b", "c", "d"})}, {"skip", json::array({"b", "d"})}},
+        "a, c"
+    );
+
+    test_template(t, "select with in test",
+        "{{ items | select('in', keep) | join(', ') }}",
+        {{"items", json::array({"a", "b", "c", "d"})}, {"keep", json::array({"b", "c"})}},
+        "b, c"
+    );
 }
 
 static void test_string_methods(testing & t) {
@@ -857,10 +1364,94 @@ static void test_string_methods(testing & t) {
         "hello jinja"
     );
 
+    test_template(t, "string.replace() empty",
+        "{{ s.replace('', '.') }}",
+        {{"s", "hello world"}},
+        ".h.e.l.l.o. .w.o.r.l.d."
+    );
+
     test_template(t, "string.replace() with count",
         "{{ s.replace('a', 'X', 2) }}",
         {{"s", "banana"}},
         "bXnXna"
+    );
+
+    test_template(t, "string.format() auto numbering",
+        "{{ '<{}|{}>'.format(s, 42) }}",
+        {{"s", "hello"}},
+        "<hello|42>"
+    );
+
+    test_template(t, "string.format() manual numbering",
+        "{{ '{1}-{0}-{1}'.format('a', 'b') }}",
+        json::object(),
+        "b-a-b"
+    );
+
+    test_template(t, "string.format() named fields",
+        "{{ '{name} is {age}'.format(name='Bob', age=7) }}",
+        json::object(),
+        "Bob is 7"
+    );
+
+    test_template(t, "string.format() escaped braces",
+        "{{ '{{}} {} {{x}}'.format('mid') }}",
+        json::object(),
+        "{} mid {x}"
+    );
+
+    test_template(t, "string.format() no fields",
+        "{{ 'plain'.format() }}",
+        json::object(),
+        "plain"
+    );
+
+    test_template(t, "undefined|capitalize",
+        "{{ arr|capitalize }}",
+        json::object(),
+        ""
+    );
+
+    test_template(t, "undefined|title",
+        "{{ arr|title }}",
+        json::object(),
+        ""
+    );
+
+    test_template(t, "undefined|truncate",
+        "{{ arr|truncate(9) }}",
+        json::object(),
+        ""
+    );
+
+    test_template(t, "undefined|upper",
+        "{{ arr|upper }}",
+        json::object(),
+        ""
+    );
+
+    test_template(t, "undefined|lower",
+        "{{ arr|lower }}",
+        json::object(),
+        ""
+    );
+
+    test_template(t, "undefined|replace",
+        "{{ arr|replace('a', 'b') }}",
+        json::object(),
+        ""
+    );
+
+    test_template(t, "undefined|trim",
+        "{{ arr|trim }}",
+        json::object(),
+        ""
+    );
+
+    test_template(t, "undefined|wordcount",
+        "{{ arr|wordcount }}",
+        json::object(),
+        "0"
     );
 }
 
@@ -934,7 +1525,17 @@ static void test_array_methods(testing & t) {
     );
 
     test_template(t, "array|join attribute",
-        "{{ arr|join(attribute=0) }}",
+        "{{ arr|join(attribute='age') }}",
+        {{"arr", json::array({
+            json({{"name", "a"}, {"age", 1}}),
+            json({{"name", "b"}, {"age", 2}}),
+            json({{"name", "c"}, {"age", 3}}),
+        })}},
+        "123"
+    );
+
+    test_template(t, "array|join numeric attribute",
+        "{{ arr|join(attribute=-1) }}",
         {{"arr", json::array({json::array({1}), json::array({2}), json::array({3})})}},
         "123"
     );
@@ -957,8 +1558,8 @@ static void test_array_methods(testing & t) {
         "a,b,c,d"
     );
 
-    test_template(t, "array.map() with attribute",
-        "{% for v in arr.map('age') %}{{ v }} {% endfor %}",
+    test_template(t, "array|map with attribute",
+        "{% for v in arr|map(attribute='age') %}{{ v }} {% endfor %}",
         {{"arr", json::array({
             json({{"name", "a"}, {"age", 1}}),
             json({{"name", "b"}, {"age", 2}}),
@@ -967,8 +1568,28 @@ static void test_array_methods(testing & t) {
         "1 2 3 "
     );
 
-    test_template(t, "array.map() with numeric attribute",
-        "{% for v in arr.map(0) %}{{ v }} {% endfor %}",
+    test_template(t, "array|map with attribute default",
+        "{% for v in arr|map(attribute='age', default=3) %}{{ v }} {% endfor %}",
+        {{"arr", json::array({
+            json({{"name", "a"}, {"age", 1}}),
+            json({{"name", "b"}, {"age", 2}}),
+            json({{"name", "c"}}),
+        })}},
+        "1 2 3 "
+    );
+
+    test_template(t, "array|map without attribute default",
+        "{% for v in arr|map(attribute='age') %}{{ v }} {% endfor %}",
+        {{"arr", json::array({
+            json({{"name", "a"}, {"age", 1}}),
+            json({{"name", "b"}, {"age", 2}}),
+            json({{"name", "c"}}),
+        })}},
+        "1 2  "
+    );
+
+    test_template(t, "array|map with numeric attribute",
+        "{% for v in arr|map(attribute=0) %}{{ v }} {% endfor %}",
         {{"arr", json::array({
             json::array({10, "x"}),
             json::array({20, "y"}),
@@ -977,12 +1598,160 @@ static void test_array_methods(testing & t) {
         "10 20 30 "
     );
 
+    test_template(t, "array|map with negative attribute",
+        "{% for v in arr|map(attribute=-1) %}{{ v }} {% endfor %}",
+        {{"arr", json::array({
+            json::array({10, "x"}),
+            json::array({20, "y"}),
+            json::array({30, "z"}),
+        })}},
+        "x y z "
+    );
+
+    test_template(t, "array|map with filter",
+        "{{ arr|map('int')|sum }}",
+        {{"arr", json::array({"1", "2", "3"})}},
+        "6"
+    );
+
+    test_template(t, "array|min",
+        "{{ [tool_calls_count, tool_sep_count]|min }}",
+        {{"tool_calls_count", 2}, {"tool_sep_count", 1}},
+        "1"
+    );
+
+    test_template(t, "array|max",
+        "{{ [tool_calls_count, tool_sep_count]|max }}",
+        {{"tool_calls_count", 2}, {"tool_sep_count", 1}},
+        "2"
+    );
+
+    test_template(t, "array|min attribute",
+        "{{ items|min(attribute='x') }}",
+        {{"items", json::array({
+            json({{"x", 2}}),
+            json({{"x", 1}}),
+        })}},
+        "{'x': 1}"
+    );
+
+    test_template(t, "array|max attribute",
+        "{{ items|max(attribute='x') }}",
+        {{"items", json::array({
+            json({{"x", 2}}),
+            json({{"x", 1}}),
+        })}},
+        "{'x': 2}"
+    );
+
     // not used by any chat templates
     // test_template(t, "array.insert()",
     //     "{% set _ = arr.insert(1, 'x') %}{{ arr|join(',') }}",
     //     {{"arr", json::array({"a", "b", "c"})}},
     //     "a,x,b,c"
     // );
+
+    test_template(t, "undefined|select",
+        "{% for item in items|select('odd') %}{{ item.name }} {% endfor %}",
+        json::object(),
+        ""
+    );
+
+    test_template(t, "undefined|selectattr",
+        "{% for item in items|selectattr('active') %}{{ item.name }} {% endfor %}",
+        json::object(),
+        ""
+    );
+
+    test_template(t, "undefined|reject",
+        "{% for item in items|reject('even') %}{{ item.name }} {% endfor %}",
+        json::object(),
+        ""
+    );
+
+    test_template(t, "undefined|rejectattr",
+        "{% for item in items|rejectattr('active') %}{{ item.name }} {% endfor %}",
+        json::object(),
+        ""
+    );
+
+    test_template(t, "undefined|list",
+        "{{ arr|list|string }}",
+        json::object(),
+        "[]"
+    );
+
+    test_template(t, "undefined|string",
+        "{{ arr|string }}",
+        json::object(),
+        ""
+    );
+
+    test_template(t, "undefined|first",
+        "{{ arr|first }}",
+        json::object(),
+        ""
+    );
+
+    test_template(t, "undefined|last",
+        "{{ arr|last }}",
+        json::object(),
+        ""
+    );
+
+    test_template(t, "undefined|length",
+        "{{ arr|length }}",
+        json::object(),
+        "0"
+    );
+
+    test_template(t, "undefined|join",
+        "{{ arr|join }}",
+        json::object(),
+        ""
+    );
+
+    test_template(t, "undefined|sort",
+        "{{ arr|sort|string }}",
+        json::object(),
+        "[]"
+    );
+
+    test_template(t, "undefined|reverse",
+        "{{ arr|reverse|join }}",
+        json::object(),
+        ""
+    );
+
+    test_template(t, "undefined|map",
+        "{% for v in arr|map(attribute='age') %}{{ v }} {% endfor %}",
+        json::object(),
+        ""
+    );
+
+    test_template(t, "undefined|min",
+        "{{ arr|min }}",
+        json::object(),
+        ""
+    );
+
+    test_template(t, "undefined|max",
+        "{{ arr|max }}",
+        json::object(),
+        ""
+    );
+
+    test_template(t, "undefined|unique",
+        "{{ arr|unique|join }}",
+        json::object(),
+        ""
+    );
+
+    test_template(t, "undefined|sum",
+        "{{ arr|sum }}",
+        json::object(),
+        "0"
+    );
 }
 
 static void test_object_methods(testing & t) {
@@ -1063,9 +1832,232 @@ static void test_object_methods(testing & t) {
         {{"obj", {{"items", json::array({1, 2, 3})}}}},
         "{\"items\": [1, 2, 3]}"
     );
+
+    test_template(t, "object attribute and key access",
+        "{{ obj.keys()|join(',') }} vs {{ obj['keys'] }} vs {{ obj.test }}",
+        {{"obj", {{"keys", "value"}, {"test", "attr_value"}}}},
+        "keys,test vs value vs attr_value"
+    );
+
+    test_template(t, "env should not have object methods",
+        "{{ keys is undefined }} {{ obj.keys is defined }}",
+        {{"obj", {{"a", "b"}}}},
+        "True True"
+    );
+
+    test_template(t, "expression as object key",
+        "{% set d = {'ab': 123} %}{{ d['a' + 'b'] == 123 }}",
+        json::object(),
+        "True"
+    );
+
+    test_template(t, "numeric as object key (template: Seed-OSS)",
+        "{% set d = {1: 'a', 2: 'b'} %}{{ d[1] == 'a' and d[2] == 'b' }}",
+        json::object(),
+        "True"
+    );
+
+    test_template(t, "undefined|items",
+        "{{ arr|items|join }}",
+        json::object(),
+        ""
+    );
 }
 
-static void test_template(testing & t, const std::string & name, const std::string & tmpl, const json & vars, const std::string & expect) {
+static void test_hasher(testing & t) {
+    static const std::vector<std::pair<size_t, size_t>> chunk_sizes = {
+        {1, 2},
+        {1, 16},
+        {8, 1},
+        {1, 1024},
+        {5, 512},
+        {16, 256},
+        {45, 122},
+        {70, 634},
+    };
+
+    static auto random_bytes = [](size_t length) -> std::string {
+        std::string data;
+        data.resize(length);
+        for (size_t i = 0; i < length; ++i) {
+            data[i] = static_cast<char>(rand() % 256);
+        }
+        return data;
+    };
+
+    t.test("state unchanged with empty input", [](testing & t) {
+        jinja::hasher hasher;
+        hasher.update("some data");
+        size_t initial_state = hasher.digest();
+        hasher.update("", 0);
+        size_t final_state = hasher.digest();
+        t.assert_true("Hasher state should remain unchanged", initial_state == final_state);
+    });
+
+    t.test("different inputs produce different hashes", [](testing & t) {
+        jinja::hasher hasher1;
+        hasher1.update("data one");
+        size_t hash1 = hasher1.digest();
+
+        jinja::hasher hasher2;
+        hasher2.update("data two");
+        size_t hash2 = hasher2.digest();
+
+        t.assert_true("Different inputs should produce different hashes", hash1 != hash2);
+    });
+
+    t.test("same inputs produce same hashes", [](testing & t) {
+        jinja::hasher hasher1;
+        hasher1.update("consistent data");
+        size_t hash1 = hasher1.digest();
+
+        jinja::hasher hasher2;
+        hasher2.update("consistent data");
+        size_t hash2 = hasher2.digest();
+
+        t.assert_true("Same inputs should produce same hashes", hash1 == hash2);
+    });
+
+    t.test("property: update(a ~ b) == update(a).update(b)", [](testing & t) {
+        for (const auto & [size1, size2] : chunk_sizes) {
+            std::string data1 = random_bytes(size1);
+            std::string data2 = random_bytes(size2);
+
+            jinja::hasher hasher1;
+            hasher1.update(data1);
+            hasher1.update(data2);
+            size_t hash1 = hasher1.digest();
+
+            jinja::hasher hasher2;
+            hasher2.update(data1 + data2);
+            size_t hash2 = hasher2.digest();
+
+            t.assert_true(
+                "Hashing in multiple updates should match single update (" + std::to_string(size1) + ", " + std::to_string(size2) + ")",
+                hash1 == hash2);
+        }
+    });
+
+    t.test("property: update(a ~ b) == update(a).update(b) with more update passes", [](testing & t) {
+        static const std::vector<size_t> sizes = {3, 732, 131, 13, 17, 256, 436, 99, 4};
+
+        jinja::hasher hasher1;
+        jinja::hasher hasher2;
+
+        std::string combined_data;
+        for (size_t size : sizes) {
+            std::string data = random_bytes(size);
+            hasher1.update(data);
+            combined_data += data;
+        }
+
+        hasher2.update(combined_data);
+        size_t hash1 = hasher1.digest();
+        size_t hash2 = hasher2.digest();
+        t.assert_true(
+            "Hashing in multiple updates should match single update with many chunks",
+            hash1 == hash2);
+    });
+
+    t.test("property: non associativity of update", [](testing & t) {
+        for (const auto & [size1, size2] : chunk_sizes) {
+            std::string data1 = random_bytes(size1);
+            std::string data2 = random_bytes(size2);
+
+            jinja::hasher hasher1;
+            hasher1.update(data1);
+            hasher1.update(data2);
+            size_t hash1 = hasher1.digest();
+
+            jinja::hasher hasher2;
+            hasher2.update(data2);
+            hasher2.update(data1);
+            size_t hash2 = hasher2.digest();
+
+            t.assert_true(
+                "Hashing order should matter (" + std::to_string(size1) + ", " + std::to_string(size2) + ")",
+                hash1 != hash2);
+        }
+    });
+
+    t.test("property: different lengths produce different hashes (padding block size)", [](testing & t) {
+        std::string random_data = random_bytes(64);
+
+        jinja::hasher hasher1;
+        hasher1.update(random_data);
+        size_t hash1 = hasher1.digest();
+
+        for (int i = 0; i < 16; ++i) {
+            random_data.push_back('A');  // change length
+            jinja::hasher hasher2;
+            hasher2.update(random_data);
+            size_t hash2 = hasher2.digest();
+
+            t.assert_true("Different lengths should produce different hashes (length " + std::to_string(random_data.size()) + ")", hash1 != hash2);
+
+            hash1 = hash2;
+        }
+    });
+}
+
+static void test_stats(testing & t) {
+    static auto get_stats = [](const std::string & tmpl, const json & vars) -> jinja::value {
+        jinja::lexer lexer;
+        auto lexer_res = lexer.tokenize(tmpl);
+
+        jinja::program prog = jinja::parse_from_tokens(lexer_res);
+
+        jinja::context ctx(tmpl);
+        jinja::global_from_json(ctx, json{{ "val", vars }}, true);
+        ctx.is_get_stats = true;
+
+        jinja::runtime runtime(ctx);
+        runtime.execute(prog);
+
+        return ctx.get_val("val");
+    };
+
+    t.test("stats", [](testing & t) {
+        jinja::value val = get_stats(
+            "{{val.num}} "
+            "{{val.str}} "
+            "{{val.arr[0]}} "
+            "{{val.obj.key1}} "
+            "{{val.nested | tojson}}",
+            // Note: the json below will be wrapped inside "val" in the context
+            json{
+                {"num", 1},
+                {"str", "abc"},
+                {"arr", json::array({1, 2, 3})},
+                {"obj", json::object({{"key1", 1}, {"key2", 2}, {"key3", 3}})},
+                {"nested", json::object({
+                    {"inner_key1", json::array({1, 2})},
+                    {"inner_key2", json::object({{"a", "x"}, {"b", "y"}})}
+                })},
+                {"mixed", json::object({
+                    {"used", 1},
+                    {"unused", 2},
+                })},
+            }
+        );
+
+        t.assert_true("num is used", val->at("num")->stats.used);
+        t.assert_true("str is used", val->at("str")->stats.used);
+
+        t.assert_true("arr is used", val->at("arr")->stats.used);
+        t.assert_true("arr[0] is used", val->at("arr")->at(0)->stats.used);
+        t.assert_true("arr[1] is not used", !val->at("arr")->at(1)->stats.used);
+
+        t.assert_true("obj is used", val->at("obj")->stats.used);
+        t.assert_true("obj.key1 is used", val->at("obj")->at("key1")->stats.used);
+        t.assert_true("obj.key2 is not used", !val->at("obj")->at("key2")->stats.used);
+
+        t.assert_true("inner_key1[0] is used", val->at("nested")->at("inner_key1")->at(0)->stats.used);
+        t.assert_true("inner_key2.a is used", val->at("nested")->at("inner_key2")->at("a")->stats.used);
+    });
+}
+
+static void test_template_cpp(testing & t, const std::string & name, const std::string & tmpl, const json & vars, const std::string & expect) {
     t.test(name, [&tmpl, &vars, &expect](testing & t) {
         jinja::lexer lexer;
         auto lexer_res = lexer.tokenize(tmpl);
@@ -1096,6 +2088,112 @@ static void test_template(testing & t, const std::string & name, const std::stri
             t.log("Skipped: " + std::string(e.what()));
         }
     });
+}
+
+// keep this in-sync with https://github.com/huggingface/transformers/blob/main/src/transformers/utils/chat_template_utils.py
+// note: we use SandboxedEnvironment instead of ImmutableSandboxedEnvironment to allow usage of in-place array methods like append() and pop()
+static std::string py_script = R"(
+import jinja2
+import jinja2.ext as jinja2_ext
+import json
+import sys
+from datetime import datetime
+from jinja2.sandbox import SandboxedEnvironment
+
+merged_input = json.loads(sys.stdin.buffer.read().decode("utf-8"))
+tmpl = merged_input["tmpl"]
+vars_json = merged_input["vars"]
+
+env = SandboxedEnvironment(
+    trim_blocks=True,
+    lstrip_blocks=True,
+    extensions=[jinja2_ext.loopcontrols],
+)
+
+def raise_exception(message):
+    raise jinja2.exceptions.TemplateError(message)
+
+env.filters["tojson"] = lambda x, ensure_ascii=False, indent=None, separators=None, sort_keys=False: json.dumps(x, ensure_ascii=ensure_ascii, indent=indent, separators=separators, sort_keys=sort_keys)
+env.globals["strftime_now"] = lambda format: datetime.now().strftime(format)
+env.globals["raise_exception"] = raise_exception
+
+template = env.from_string(tmpl)
+result = template.render(**vars_json)
+sys.stdout.buffer.write(result.encode())
+)";
+
+static void test_template_py(testing & t, const std::string & name, const std::string & tmpl, const json & vars, const std::string & expect) {
+    t.test(name, [&tmpl, &vars, &expect](testing & t) {
+        // Prepare arguments
+        json merged;
+        merged["tmpl"] = json(tmpl);
+        merged["vars"] = vars;
+
+#ifdef _WIN32
+        const char * python_executable = "python.exe";
+#else
+        const char * python_executable = "python3";
+#endif
+
+        std::vector<std::string> args = {python_executable, "-c", py_script, };
+
+        common_subproc subprocess;
+        int options = subprocess_option_combined_stdout_stderr
+                    | subprocess_option_no_window
+                    | subprocess_option_inherit_environment
+                    | subprocess_option_search_user_path;
+
+        if (!subprocess.create(args, options)) {
+            t.log("Failed to create subprocess");
+            t.assert_true("subprocess creation", false);
+            return;
+        }
+        FILE * p_stdin = subprocess.stdin_file();
+
+        // Write input
+        std::string input = merged.dump();
+        auto written = fwrite(input.c_str(), 1, input.size(), p_stdin);
+        if (written != input.size()) {
+            t.log("Failed to write complete input to subprocess stdin");
+            t.assert_true("subprocess stdin write", false);
+            subprocess.close_stdin();
+            subprocess.join();
+            return;
+        }
+        fflush(p_stdin);
+        subprocess.close_stdin(); // Close stdin to signal EOF to the Python process
+
+        // Read output
+        std::string output;
+        char buffer[1024];
+        FILE * p_stdout = subprocess.stdout_file();
+        while (fgets(buffer, sizeof(buffer), p_stdout)) {
+            output += buffer;
+        }
+
+        int process_return = subprocess.join();
+
+        if (process_return != 0) {
+            t.log("Python script failed with exit code: " + std::to_string(process_return));
+            t.log("Output: " + output);
+            t.assert_true("python execution", false);
+            return;
+        }
+
+        if (!t.assert_true("Template render mismatch", expect == output)) {
+            t.log("Template: " + json(tmpl).dump());
+            t.log("Expected: " + json(expect).dump());
+            t.log("Python  : " + json(output).dump());
+        }
+    });
+}
+
+static void test_template(testing & t, const std::string & name, const std::string & tmpl, const json & vars, const std::string & expect) {
+    if (g_python_mode) {
+        test_template_py(t, name, tmpl, vars, expect);
+    } else {
+        test_template_cpp(t, name, tmpl, vars, expect);
+    }
 }
 
 //
@@ -1366,6 +2464,7 @@ static void test_fuzzing(testing & t) {
 
     t.test("malformed templates (should error, not crash)", [&](testing & t) {
         const std::vector<std::string> malformed = {
+            "",
             "{{ x",
             "{% if %}",
             "{% for %}",
@@ -1385,6 +2484,11 @@ static void test_fuzzing(testing & t) {
         };
         for (const auto & tmpl : malformed) {
             t.assert_true("malformed: " + tmpl, fuzz_test_template(tmpl, json::object()));
+        }
+        std::string tmpl = "{% for message in messages %}{{ message.role | string }} : {{ message.content if ('content' in message and message.content is not none) }}{% endfor %";
+        while (tmpl.length() > 0) {
+            t.assert_true("malformed: " + tmpl, fuzz_test_template(tmpl, json::object()));
+            tmpl.pop_back();
         }
     });
 
@@ -1505,5 +2609,13 @@ static void test_fuzzing(testing & t) {
 
             t.assert_true("builtin " + type_name + "." + fn_name + " #" + std::to_string(i), fuzz_test_template(tmpl, vars));
         }
+    });
+
+    t.test("tojson ensure_ascii=true with invalid utf-8", [&](testing & t) {
+        t.assert_true("invalid utf-8 does not crash",
+            fuzz_test_template(
+                "{{ data|tojson(ensure_ascii=true) }}",
+                {{"data", std::string("hello\xfe\xffworld")}}
+            ));
     });
 }
