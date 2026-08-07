@@ -34,7 +34,7 @@ main()
 
 **Output:** JSON on stdout — `prompt`, `response`, `category`, `status`, `metadata`
 
-See [`docs/owasp-llm-flow.html`](docs/owasp-llm-flow.html) for the call flow diagram and [`docs/owasp-llm-map.html`](docs/owasp-llm-map.html) for the full architecture map.
+See [`docs/owasp-llm-notes.md`](docs/owasp-llm-notes.md) for a written walkthrough of the call flow and [`docs/owasp-llm-map.html`](docs/owasp-llm-map.html) for the full architecture map.
 
 ## Build
 
