@@ -28,6 +28,22 @@ std::string naive_risk_classifier(const std::string& prompt) {
         return "LLM02";
     }
 
+    // LLM02:2025 Sensitive Information Disclosure
+    if (lower.find("social security") != std::string::npos ||
+        lower.find("ssn") != std::string::npos ||
+        lower.find("credit card number") != std::string::npos ||
+        lower.find("customer email") != std::string::npos ||
+        lower.find("customer database") != std::string::npos ||
+        lower.find("customer records") != std::string::npos ||
+        lower.find("api key") != std::string::npos ||
+        lower.find("secret key") != std::string::npos ||
+        lower.find("password for") != std::string::npos ||
+        lower.find("phone number of") != std::string::npos ||
+        lower.find("home address of") != std::string::npos ||
+        lower.find("personal information about") != std::string::npos) {
+        return "LLM02_2025";
+    }
+
     // LLM01: Prompt Injection
     if (lower.find("ignore") != std::string::npos ||
         lower.find("disregard") != std::string::npos ||
