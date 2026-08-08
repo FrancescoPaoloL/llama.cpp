@@ -83,6 +83,39 @@ std::string naive_risk_classifier(const std::string& prompt) {
         return "LLM06";
     }
 
+    // LLM06:2025 Excessive Agency
+    int agency_score = 0;
+
+    bool wants_autonomy =
+        lower.find("without asking") != std::string::npos ||
+        lower.find("without confirmation") != std::string::npos ||
+        lower.find("without checking") != std::string::npos ||
+        lower.find("no need to confirm") != std::string::npos ||
+        lower.find("skip confirmation") != std::string::npos ||
+        lower.find("don't ask me") != std::string::npos;
+
+    bool wants_elevated_permission =
+        lower.find("full access to") != std::string::npos ||
+        lower.find("grant yourself") != std::string::npos ||
+        lower.find("admin access") != std::string::npos ||
+        lower.find("root access") != std::string::npos ||
+        lower.find("all permissions") != std::string::npos;
+
+    bool wants_recurring_autonomous_action =
+        lower.find("do this every time") != std::string::npos ||
+        lower.find("automatically execute") != std::string::npos ||
+        lower.find("act on my behalf") != std::string::npos ||
+        lower.find("make decisions for me") != std::string::npos ||
+        lower.find("handle this on your own") != std::string::npos;
+
+    if (wants_autonomy) { agency_score++; }
+    if (wants_elevated_permission) { agency_score++; }
+    if (wants_recurring_autonomous_action) { agency_score++; }
+
+    if (agency_score >= 2) {
+        return "LLM06_2025";
+    }
+
     // LLM09: Misinformation
     float llm09_score = detect_llm09_misinformation(prompt);
     //std::cerr << "LLM09 score: " << llm09_score << "\n";
