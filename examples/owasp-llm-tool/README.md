@@ -14,7 +14,15 @@ Educational project demonstrating LLM security vulnerabilities and defenses usin
 | LLM06 | Excessive Agency | Naive keyword matching |
 | LLM09 | Misinformation | Multi sub-detector scoring |
 
-> **Note:** LLM01/02/04/05/06 use intentionally simple pattern matching to illustrate the limits of keyword-based detection. LLM03 and LLM09 use more sophisticated approaches.
+| LLM06 | Excessive Agency | Naive keyword matching |
+| LLM09 | Misinformation | Multi sub-detector scoring |
+| LLM02:2025 | Sensitive Information Disclosure | Naive keyword matching |
+| LLM06:2025 | Excessive Agency | Scored (2 of 3 signals required) |
+
+**Note:** LLM01/02/04/05/06 use intentionally simple pattern matching to illustrate the limits of keyword-based detection. LLM03, LLM09, and LLM06:2025 use more sophisticated approaches.
+
+**LLM06 note:** despite the label, the detector under `LLM06` actually implements **System Prompt Leakage** (LLM07 in the 2025 OWASP numbering) — a pre-existing mislabel kept as-is pending a full renumbering pass. `LLM06:2025` is the real Excessive Agency detector, added separately under a temporary label to avoid colliding with the existing `LLM06` string.
+
 
 ## Architecture
 
@@ -22,7 +30,7 @@ Educational project demonstrating LLM security vulnerabilities and defenses usin
 main()
 └── run_llama_or_detect()         llama_runner.cpp:172
     ├── [fast path] naive_risk_classifier()   category.cpp:9
-    │   └── returns LLM01/02/04/05/06/09 or "unknown"
+    │   └── returns LLM01/02/02:2025/04/05/06/06:2025/09 or "unknown"
     └── [full path] run_llama()              llama_runner.cpp:14
         ├── naive_risk_classifier()          (gate — skips model if matched)
         ├── Load model + tokenize + generate + detokenize
